@@ -351,6 +351,278 @@
                 }
             }
         },
+        "/news/preview/newsapi": {
+            "get": {
+                "tags": [
+                    "News Fetch"
+                ],
+                "summary": "Fetch live articles from NewsAPI.org",
+                "description": "Calls the NewsAPI.org /top-headlines endpoint with your parameters and returns mapped articles. Results are NOT saved to the database.",
+                "operationId": "e5d3b8fc039e910b0a1d5c8a571962bb",
+                "parameters": [
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "description": "Keywords to search for in article title/description",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "example": "technology"
+                        }
+                    },
+                    {
+                        "name": "country",
+                        "in": "query",
+                        "description": "2-letter ISO country code (e.g. us, gb, in). Cannot be used with sources.",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "example": "us"
+                        }
+                    },
+                    {
+                        "name": "category",
+                        "in": "query",
+                        "description": "News category",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "business",
+                                "entertainment",
+                                "general",
+                                "health",
+                                "science",
+                                "sports",
+                                "technology"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "sources",
+                        "in": "query",
+                        "description": "Comma-separated news source IDs (e.g. bbc-news,cnn). Cannot be used with country/category.",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "example": "bbc-news"
+                        }
+                    },
+                    {
+                        "name": "pageSize",
+                        "in": "query",
+                        "description": "Number of results to return (default 20, max 100)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 10
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "Page number",
+                        "required": false,
+                        "schema": {
+                            "type": "integer",
+                            "example": 1
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Mapped articles from NewsAPI.org",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "source": {
+                                            "type": "string",
+                                            "example": "NewsAPI"
+                                        },
+                                        "total_results": {
+                                            "type": "integer",
+                                            "example": 38
+                                        },
+                                        "articles_returned": {
+                                            "type": "integer",
+                                            "example": 10
+                                        },
+                                        "articles": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/Article"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Source not configured"
+                    },
+                    "502": {
+                        "description": "Third-party API error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "error": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/news/preview/newsdata": {
+            "get": {
+                "tags": [
+                    "News Fetch"
+                ],
+                "summary": "Fetch live articles from NewsData.io",
+                "description": "Calls the NewsData.io /latest endpoint with your parameters and returns mapped articles. Results are NOT saved to the database.",
+                "operationId": "b5a0426638203d49414c5ddd73fc276a",
+                "parameters": [
+                    {
+                        "name": "q",
+                        "in": "query",
+                        "description": "Keywords to search for (max 512 chars)",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "example": "artificial intelligence"
+                        }
+                    },
+                    {
+                        "name": "country",
+                        "in": "query",
+                        "description": "Comma-separated 2-letter country codes (e.g. us,gb)",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "example": "us"
+                        }
+                    },
+                    {
+                        "name": "category",
+                        "in": "query",
+                        "description": "News category",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "enum": [
+                                "business",
+                                "crime",
+                                "domestic",
+                                "education",
+                                "entertainment",
+                                "environment",
+                                "food",
+                                "health",
+                                "lifestyle",
+                                "politics",
+                                "science",
+                                "sports",
+                                "technology",
+                                "top",
+                                "world"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "language",
+                        "in": "query",
+                        "description": "Comma-separated language codes (e.g. en,hi)",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "example": "en"
+                        }
+                    },
+                    {
+                        "name": "domain",
+                        "in": "query",
+                        "description": "Comma-separated domain names (e.g. bbc.co.uk,cnn.com)",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "example": "bbc.co.uk"
+                        }
+                    },
+                    {
+                        "name": "page",
+                        "in": "query",
+                        "description": "Next page token (returned in previous response as next_page)",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Mapped articles from NewsData.io",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "source": {
+                                            "type": "string",
+                                            "example": "NewsData.io"
+                                        },
+                                        "total_results": {
+                                            "type": "integer",
+                                            "example": 100
+                                        },
+                                        "articles_returned": {
+                                            "type": "integer",
+                                            "example": 10
+                                        },
+                                        "next_page": {
+                                            "type": "string",
+                                            "example": "eyJpZCI6MTIzNH0",
+                                            "nullable": true
+                                        },
+                                        "articles": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/Article"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Source not configured"
+                    },
+                    "502": {
+                        "description": "Third-party API error",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "error": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/sources": {
             "get": {
                 "tags": [
@@ -662,6 +934,10 @@
         }
     },
     "tags": [
+        {
+            "name": "News Fetch",
+            "description": "Trigger news fetching from third-party APIs"
+        },
         {
             "name": "Articles",
             "description": "Fetched news articles"
