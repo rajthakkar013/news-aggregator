@@ -362,3 +362,27 @@ php artisan schedule:list
 # Clear failed jobs
 php artisan queue:flush
 ```
+
+---
+
+## Clearing Data
+
+Use this command to reset all fetched data and log files during development or testing.
+
+```bash
+# Clear everything — DB tables (articles, cron_logs, api_logs) + log files
+php artisan news:clear
+
+# Clear only log files in storage/logs/newsapi/ and storage/logs/newsdata/
+php artisan news:clear --logs-only
+
+# Clear only DB records, keep log files on disk
+php artisan news:clear --db-only
+```
+
+> **What it clears:**
+> - `articles` table — all fetched news articles
+> - `cron_logs` table — all cron execution records
+> - `api_logs` table — all API fetch records
+> - `storage/logs/newsapi/*.log` — all NewsAPI log files
+> - `storage/logs/newsdata/*.log` — all NewsData log files

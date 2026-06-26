@@ -21,9 +21,19 @@ class FetchNewsSourceJob implements ShouldQueue
 
     public function handle(NewsApiFetcherService $fetcher): void
     {
+        $log  = Log::channel($this->source->slug);
         $from = $this->source->last_fetched_at ?? now()->subHour();
         $to   = now();
 
+        // Step 1: Job picked up
+        $log->info('--- STEP 1: Job picked up from queue ---', [
+            'source'       => $this->source->name,
+            'slug'         => $this->source->slug,
+            'queue'        => $this->queue,
+            'cron_log_id'  => $this->cronLogId,
+        ]);
+
+        // Step 2: Create API log entry
         $apiLog = ApiLog::create([
             'cron_log_id'        => $this->cronLogId,
             'news_api_source_id' => $this->source->id,
@@ -33,17 +43,19 @@ class FetchNewsSourceJob implements ShouldQueue
             'started_at'         => now(),
         ]);
 
-        $log = Log::channel($this->source->slug);
-
-        $log->info('Job started', [
-            'source'    => $this->source->name,
-            'from_date' => $from,
-            'to_date'   => $to,
+        $log->info('--- STEP 2: API log created ---', [
+            'api_log_id' => $apiLog->id,
+            'from_date'  => $from,
+            'to_date'    => $to,
         ]);
 
         try {
+            // Step 3: Dispatch to fetcher service
+            $log->info('--- STEP 3: Dispatching to fetcher service ---');
+
             $result = $fetcher->fetchNewses($this->source);
 
+            // Step 8: Update API log with results
             $apiLog->update([
                 'status'           => 'success',
                 'articles_fetched' => $result['fetched'],
@@ -51,11 +63,19 @@ class FetchNewsSourceJob implements ShouldQueue
                 'finished_at'      => now(),
             ]);
 
+            $log->info('--- STEP 8: API log updated ---', [
+                'api_log_id'       => $apiLog->id,
+                'status'           => 'success',
+                'articles_fetched' => $result['fetched'],
+                'articles_saved'   => $result['saved'],
+            ]);
+
+            // Step 9: Update last_fetched_at on source
             $this->source->update(['last_fetched_at' => $to]);
 
-            $log->info('Job completed', [
-                'fetched' => $result['fetched'],
-                'saved'   => $result['saved'],
+            $log->info('--- STEP 9: Source last_fetched_at updated ---', [
+                'source'          => $this->source->name,
+                'last_fetched_at' => $to,
             ]);
 
         } catch (Throwable $e) {
@@ -65,7 +85,10 @@ class FetchNewsSourceJob implements ShouldQueue
                 'finished_at'   => now(),
             ]);
 
-            $log->error('Job failed', ['error' => $e->getMessage()]);
+            $log->error('--- JOB FAILED ---', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
         }
     }
 }
