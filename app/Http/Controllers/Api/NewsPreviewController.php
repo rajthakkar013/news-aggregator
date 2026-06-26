@@ -87,7 +87,7 @@ class NewsPreviewController extends Controller
     )]
     public function newsapi(Request $request): JsonResponse
     {
-        return $this->preview('newsapi', 'ok', $request);
+        return $this->preview('newsapi', $request);
     }
 
     // -------------------------------------------------------------------------
@@ -167,13 +167,13 @@ class NewsPreviewController extends Controller
     )]
     public function newsdata(Request $request): JsonResponse
     {
-        return $this->preview('newsdata', 'success', $request);
+        return $this->preview('newsdata', $request);
     }
 
     // -------------------------------------------------------------------------
     // Shared logic
     // -------------------------------------------------------------------------
-    private function preview(string $slug, string $expectedStatus, Request $request): JsonResponse
+    private function preview(string $slug, Request $request): JsonResponse
     {
         $source = NewsApiSource::where('slug', $slug)->where('is_active', true)->first();
 
@@ -184,17 +184,18 @@ class NewsPreviewController extends Controller
         $credentials   = $source->credentials;
         $requestConfig = $source->request_config;
 
-        // Start from source default_params, then override with request query params
-        $params = array_merge(
-            (array) ($requestConfig['default_params'] ?? []),
-            array_filter($request->only(['q', 'country', 'category', 'language', 'sources', 'domain', 'pageSize', 'page']),
-                fn($v) => $v !== null && $v !== ''
-            ),
-            [$credentials['param_name'] => $credentials['api_key']]
+        $userParams = \array_filter(
+            $request->only(['q', 'country', 'category', 'language', 'sources', 'domain', 'pageSize', 'page']),
+            fn($v) => $v !== null && $v !== ''
         );
 
-        $url = rtrim($source->base_url, '/') . $requestConfig['endpoint'];
+        $params = [
+            ...(array) ($requestConfig['default_params'] ?? []),
+            ...$userParams,
+            $credentials['param_name'] => $credentials['api_key'],
+        ];
 
+        $url      = rtrim($source->base_url, '/') . $requestConfig['endpoint'];
         $response = Http::get($url, $params);
 
         if (!$response->successful()) {
@@ -204,7 +205,7 @@ class NewsPreviewController extends Controller
         $body           = $response->json();
         $receivedStatus = $body[$source->status_param] ?? null;
 
-        if ($receivedStatus !== $expectedStatus) {
+        if ($receivedStatus !== $source->success_status) {
             $message = $body['message'] ?? $body['results']['message'] ?? 'Unknown error from API';
             return response()->json(['error' => $message], 502);
         }
@@ -219,14 +220,14 @@ class NewsPreviewController extends Controller
             $article = ['source_slug' => $slug];
 
             foreach ($responseParam as $ourKey => $apiKey) {
-                if (in_array($ourKey, $skip, true) || $apiKey === null) {
+                if (\in_array($ourKey, $skip, true) || $apiKey === null) {
                     continue;
                 }
                 $value = $this->extractValue((array) $raw, (string) $apiKey);
 
-                if (in_array($ourKey, $jsonFields, true)) {
-                    $value = is_array($value) ? $value : null;
-                } elseif (is_array($value)) {
+                if (\in_array($ourKey, $jsonFields, true)) {
+                    $value = \is_array($value) ? $value : null;
+                } elseif (\is_array($value)) {
                     $value = implode(', ', $value);
                 }
 
@@ -238,12 +239,11 @@ class NewsPreviewController extends Controller
 
         $result = [
             'source'            => $source->name,
-            'total_results'     => $body['totalResults'] ?? $body['total_results'] ?? count($mapped),
-            'articles_returned' => count($mapped),
+            'total_results'     => $body['totalResults'] ?? $body['total_results'] ?? \count($mapped),
+            'articles_returned' => \count($mapped),
             'articles'          => $mapped,
         ];
 
-        // Attach next_page token for NewsData pagination
         $nextPageKey = $responseParam['next_page'] ?? null;
         if ($nextPageKey && isset($body[$nextPageKey])) {
             $result['next_page'] = $body[$nextPageKey];
@@ -257,7 +257,7 @@ class NewsPreviewController extends Controller
     private function extractValue(array $data, string $path): mixed
     {
         foreach (explode('.', $path) as $key) {
-            if (!is_array($data) || !array_key_exists($key, $data)) {
+            if (!\is_array($data) || !\array_key_exists($key, $data)) {
                 return null;
             }
             $data = $data[$key];

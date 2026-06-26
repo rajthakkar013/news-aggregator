@@ -27,8 +27,9 @@ class NewsApiSourceSeeder extends Seeder
                         'pageSize' => 20,
                     ],
                 ],
-                'status_param'  => 'status',
-                'results_param' => 'articles',
+                'status_param'   => 'status',
+                'success_status' => 'ok',
+                'results_param'  => 'articles',
                 'response_param' => [
                     'total_results' => 'totalResults',
                     'next_page'     => null,
@@ -57,8 +58,9 @@ class NewsApiSourceSeeder extends Seeder
                     'method'   => 'GET',
                     'endpoint' => '/latest',
                 ],
-                'status_param'  => 'status',
-                'results_param' => 'results',
+                'status_param'   => 'status',
+                'success_status' => 'success',
+                'results_param'  => 'results',
                 'response_param' => [
                     'total_results'    => 'totalResults',
                     'next_page'        => 'nextPage',
