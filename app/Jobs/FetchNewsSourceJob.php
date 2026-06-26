@@ -21,9 +21,10 @@ class FetchNewsSourceJob implements ShouldQueue
 
     public function handle(): void
     {
-        $log  = Log::channel($this->source->slug);
-        $from = $this->source->last_fetched_at ?? now()->subHour();
-        $to   = now();
+        $log     = Log::channel($this->source->slug);
+        $fetcher = new NewsApiFetcherService($this->source);
+        $from    = $fetcher->getFrom();
+        $to      = $fetcher->getTo();
 
         $log->info('--- STEP 1: Job picked up from queue ---', [
             'source'      => $this->source->name,
@@ -38,19 +39,21 @@ class FetchNewsSourceJob implements ShouldQueue
             'status'             => 'pending',
             'from_date'          => $from,
             'to_date'            => $to,
+            'request_params'     => $fetcher->getRequestParams(),
             'started_at'         => now(),
         ]);
 
         $log->info('--- STEP 2: API log created ---', [
-            'api_log_id' => $apiLog->id,
-            'from_date'  => $from,
-            'to_date'    => $to,
+            'api_log_id'     => $apiLog->id,
+            'from_date'      => $from,
+            'to_date'        => $to,
+            'request_params' => $fetcher->getRequestParams(),
         ]);
 
         try {
             $log->info('--- STEP 3: Dispatching to fetcher service ---');
 
-            $result = (new NewsApiFetcherService($this->source))->fetchNewses();
+            $result = $fetcher->fetchNewses();
 
             // Step 8: Update API log with results
             $apiLog->update([

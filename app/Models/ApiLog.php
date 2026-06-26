@@ -15,16 +15,18 @@ class ApiLog extends Model
         'articles_saved',
         'from_date',
         'to_date',
+        'request_params',
         'error_message',
         'started_at',
         'finished_at',
     ];
 
     protected $casts = [
-        'from_date'   => 'datetime',
-        'to_date'     => 'datetime',
-        'started_at'  => 'datetime',
-        'finished_at' => 'datetime',
+        'from_date'      => 'datetime',
+        'to_date'        => 'datetime',
+        'request_params' => 'array',
+        'started_at'     => 'datetime',
+        'finished_at'    => 'datetime',
     ];
 
     public function cronLog(): BelongsTo
