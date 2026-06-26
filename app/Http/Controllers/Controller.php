@@ -11,6 +11,7 @@ use OpenApi\Attributes as OA;
     contact: new OA\Contact(email: 'rgthakkar013@gmail.com')
 )]
 #[OA\Server(url: '/api', description: 'API Server')]
+#[OA\Tag(name: 'News Fetch', description: 'Trigger news fetching from third-party APIs')]
 #[OA\Tag(name: 'Articles',  description: 'Fetched news articles')]
 #[OA\Tag(name: 'Sources',   description: 'Third-party news API source configurations')]
 #[OA\Tag(name: 'Cron Logs', description: 'Cron execution history')]
