@@ -19,21 +19,19 @@ class FetchNewsSourceJob implements ShouldQueue
         public readonly int $cronLogId,
     ) {}
 
-    public function handle(NewsApiFetcherService $fetcher): void
+    public function handle(): void
     {
         $log  = Log::channel($this->source->slug);
         $from = $this->source->last_fetched_at ?? now()->subHour();
         $to   = now();
 
-        // Step 1: Job picked up
         $log->info('--- STEP 1: Job picked up from queue ---', [
-            'source'       => $this->source->name,
-            'slug'         => $this->source->slug,
-            'queue'        => $this->queue,
-            'cron_log_id'  => $this->cronLogId,
+            'source'      => $this->source->name,
+            'slug'        => $this->source->slug,
+            'queue'       => $this->queue,
+            'cron_log_id' => $this->cronLogId,
         ]);
 
-        // Step 2: Create API log entry
         $apiLog = ApiLog::create([
             'cron_log_id'        => $this->cronLogId,
             'news_api_source_id' => $this->source->id,
@@ -50,10 +48,9 @@ class FetchNewsSourceJob implements ShouldQueue
         ]);
 
         try {
-            // Step 3: Dispatch to fetcher service
             $log->info('--- STEP 3: Dispatching to fetcher service ---');
 
-            $result = $fetcher->fetchNewses($this->source);
+            $result = (new NewsApiFetcherService($this->source))->fetchNewses();
 
             // Step 8: Update API log with results
             $apiLog->update([

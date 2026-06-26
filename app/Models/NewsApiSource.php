@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property array<string, mixed>  $credentials
  * @property array<string, mixed>  $request_config
  * @property string                $status_param
+ * @property string                $success_status
  * @property string                $results_param
  * @property array<string, mixed>|null $response_param
  * @property bool                  $is_active
@@ -29,6 +30,7 @@ class NewsApiSource extends Model
         'credentials',
         'request_config',
         'status_param',
+        'success_status',
         'results_param',
         'response_param',
         'is_active',
