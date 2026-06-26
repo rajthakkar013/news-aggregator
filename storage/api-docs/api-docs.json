@@ -1,0 +1,682 @@
+{
+    "openapi": "3.0.0",
+    "info": {
+        "title": "News Aggregator API",
+        "description": "Backend API for fetching and serving aggregated news articles from multiple third-party sources.",
+        "contact": {
+            "email": "rgthakkar013@gmail.com"
+        },
+        "version": "1.0.0"
+    },
+    "servers": [
+        {
+            "url": "/api",
+            "description": "API Server"
+        }
+    ],
+    "paths": {
+        "/api-logs": {
+            "get": {
+                "tags": [
+                    "API Logs"
+                ],
+                "summary": "List API fetch logs",
+                "description": "Returns a paginated list of per-source API fetch results. Filterable by source and status.",
+                "operationId": "6e3369e297d9f668955d24786cd518af",
+                "parameters": [
+                    {
+                        "name": "source_id",
+                        "in": "query",
+                        "description": "Filter by news_api_source_id",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "description": "Filter by status (pending, success, failed)",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "description": "Results per page (default 15)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated list of API logs",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/ApiLog"
+                                            }
+                                        },
+                                        "meta": {
+                                            "$ref": "#/components/schemas/PaginationMeta"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/api-logs/{id}": {
+            "get": {
+                "tags": [
+                    "API Logs"
+                ],
+                "summary": "Get a single API fetch log",
+                "operationId": "7cf31ba7014816eb1ca6ec08a088e16f",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "API Log ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "API log detail",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/ApiLog"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "API log not found"
+                    }
+                }
+            }
+        },
+        "/articles": {
+            "get": {
+                "tags": [
+                    "Articles"
+                ],
+                "summary": "List all articles",
+                "description": "Returns a paginated list of articles. Supports filtering by source, language, sentiment, keyword search, and date range.",
+                "operationId": "20f46a4be21edb0179e4df7acaa45c18",
+                "parameters": [
+                    {
+                        "name": "source_id",
+                        "in": "query",
+                        "description": "Filter by news_api_source_id",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "language",
+                        "in": "query",
+                        "description": "Filter by language code (e.g. en)",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "sentiment",
+                        "in": "query",
+                        "description": "Filter by sentiment (positive, negative, neutral)",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "search",
+                        "in": "query",
+                        "description": "Search in title and description",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "from",
+                        "in": "query",
+                        "description": "Published from date (Y-m-d)",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "to",
+                        "in": "query",
+                        "description": "Published to date (Y-m-d)",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "description": "Results per page (default 15)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated list of articles",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/Article"
+                                            }
+                                        },
+                                        "meta": {
+                                            "$ref": "#/components/schemas/PaginationMeta"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/articles/{id}": {
+            "get": {
+                "tags": [
+                    "Articles"
+                ],
+                "summary": "Get a single article",
+                "operationId": "90f7485e28819211cd54fc2b866bd33c",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Article ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Article detail",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/Article"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Article not found"
+                    }
+                }
+            }
+        },
+        "/cron-logs": {
+            "get": {
+                "tags": [
+                    "Cron Logs"
+                ],
+                "summary": "List cron execution logs",
+                "description": "Returns a paginated history of cron runs with status and source counts.",
+                "operationId": "2791295f0ef238c1926f367477d0c6a2",
+                "parameters": [
+                    {
+                        "name": "status",
+                        "in": "query",
+                        "description": "Filter by status (started, completed, failed)",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "per_page",
+                        "in": "query",
+                        "description": "Results per page (default 15)",
+                        "required": false,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Paginated list of cron logs",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/CronLog"
+                                            }
+                                        },
+                                        "meta": {
+                                            "$ref": "#/components/schemas/PaginationMeta"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/cron-logs/{id}": {
+            "get": {
+                "tags": [
+                    "Cron Logs"
+                ],
+                "summary": "Get a single cron log with its API logs",
+                "operationId": "ed7c140aac2d45973fa999195f00dec5",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Cron Log ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Cron log with nested API logs",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "allOf": [
+                                        {
+                                            "$ref": "#/components/schemas/CronLog"
+                                        },
+                                        {
+                                            "properties": {
+                                                "api_logs": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "$ref": "#/components/schemas/ApiLog"
+                                                    }
+                                                }
+                                            },
+                                            "type": "object"
+                                        }
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Cron log not found"
+                    }
+                }
+            }
+        },
+        "/sources": {
+            "get": {
+                "tags": [
+                    "Sources"
+                ],
+                "summary": "List all news API sources",
+                "description": "Returns all configured third-party news API sources. Credentials are excluded.",
+                "operationId": "6830d86f9e3aa453fb3e66a3de520043",
+                "responses": {
+                    "200": {
+                        "description": "List of sources",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/NewsApiSource"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/sources/{id}": {
+            "get": {
+                "tags": [
+                    "Sources"
+                ],
+                "summary": "Get a single news API source",
+                "description": "Returns source configuration including request config and response mapping. Credentials are excluded.",
+                "operationId": "056a9105fb6fe61b18a849500faf20d9",
+                "parameters": [
+                    {
+                        "name": "id",
+                        "in": "path",
+                        "description": "Source ID",
+                        "required": true,
+                        "schema": {
+                            "type": "integer"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Source detail",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "$ref": "#/components/schemas/NewsApiSource"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Source not found"
+                    }
+                }
+            }
+        }
+    },
+    "components": {
+        "schemas": {
+            "PaginationMeta": {
+                "properties": {
+                    "current_page": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "last_page": {
+                        "type": "integer",
+                        "example": 10
+                    },
+                    "per_page": {
+                        "type": "integer",
+                        "example": 15
+                    },
+                    "total": {
+                        "type": "integer",
+                        "example": 150
+                    }
+                },
+                "type": "object"
+            },
+            "Article": {
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "news_api_source_id": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "external_id": {
+                        "type": "string",
+                        "example": "abc123",
+                        "nullable": true
+                    },
+                    "title": {
+                        "type": "string",
+                        "example": "Breaking News"
+                    },
+                    "description": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "url": {
+                        "type": "string",
+                        "example": "https://example.com/article"
+                    },
+                    "source_id": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "source_name": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "author": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "image_url": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "content": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "published_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    },
+                    "language": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "category": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "nullable": true
+                    },
+                    "country": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "nullable": true
+                    },
+                    "sentiment": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "created_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    }
+                },
+                "type": "object"
+            },
+            "NewsApiSource": {
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "NewsAPI"
+                    },
+                    "slug": {
+                        "type": "string",
+                        "example": "newsapi"
+                    },
+                    "base_url": {
+                        "type": "string",
+                        "example": "https://newsapi.org/v2"
+                    },
+                    "auth_type": {
+                        "type": "string",
+                        "enum": [
+                            "api_key",
+                            "bearer",
+                            "basic",
+                            "oauth2"
+                        ]
+                    },
+                    "status_param": {
+                        "type": "string",
+                        "example": "status"
+                    },
+                    "results_param": {
+                        "type": "string",
+                        "example": "articles"
+                    },
+                    "is_active": {
+                        "type": "boolean",
+                        "example": true
+                    },
+                    "last_fetched_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "CronLog": {
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "started",
+                            "completed",
+                            "failed"
+                        ]
+                    },
+                    "sources_triggered": {
+                        "type": "integer",
+                        "example": 2
+                    },
+                    "started_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "finished_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    },
+                    "notes": {
+                        "type": "string",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
+            "ApiLog": {
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "cron_log_id": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "news_api_source_id": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "status": {
+                        "type": "string",
+                        "enum": [
+                            "pending",
+                            "success",
+                            "failed"
+                        ]
+                    },
+                    "articles_fetched": {
+                        "type": "integer",
+                        "example": 20
+                    },
+                    "articles_saved": {
+                        "type": "integer",
+                        "example": 18
+                    },
+                    "from_date": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    },
+                    "to_date": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    },
+                    "error_message": {
+                        "type": "string",
+                        "nullable": true
+                    },
+                    "started_at": {
+                        "type": "string",
+                        "format": "date-time"
+                    },
+                    "finished_at": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            }
+        }
+    },
+    "tags": [
+        {
+            "name": "Articles",
+            "description": "Fetched news articles"
+        },
+        {
+            "name": "Sources",
+            "description": "Third-party news API source configurations"
+        },
+        {
+            "name": "Cron Logs",
+            "description": "Cron execution history"
+        },
+        {
+            "name": "API Logs",
+            "description": "Per-source API fetch logs"
+        }
+    ]
+}
