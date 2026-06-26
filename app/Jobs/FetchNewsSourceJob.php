@@ -3,7 +3,7 @@
 namespace App\Jobs;
 
 use App\Models\ApiLog;
-use App\Models\NewsApiSource;
+use App\Models\NewsApiEndpoint;
 use App\Services\NewsApiFetcherService;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -15,27 +15,29 @@ class FetchNewsSourceJob implements ShouldQueue
     use Queueable;
 
     public function __construct(
-        public readonly NewsApiSource $source,
+        public readonly NewsApiEndpoint $endpoint,
         public readonly int $cronLogId,
     ) {}
 
     public function handle(): void
     {
-        $log     = Log::channel($this->source->slug);
-        $fetcher = new NewsApiFetcherService($this->source);
+        $source  = $this->endpoint->source;
+        $log     = Log::channel($source->slug);
+        $fetcher = new NewsApiFetcherService($this->endpoint);
         $from    = $fetcher->getFrom();
         $to      = $fetcher->getTo();
 
         $log->info('--- STEP 1: Job picked up from queue ---', [
-            'source'      => $this->source->name,
-            'slug'        => $this->source->slug,
+            'source'      => $source->name,
+            'slug'        => $source->slug,
+            'endpoint'    => $this->endpoint->endpoint,
             'queue'       => $this->queue,
             'cron_log_id' => $this->cronLogId,
         ]);
 
         $apiLog = ApiLog::create([
             'cron_log_id'        => $this->cronLogId,
-            'news_api_source_id' => $this->source->id,
+            'news_api_source_id' => $source->id,
             'status'             => 'pending',
             'from_date'          => $from,
             'to_date'            => $to,
@@ -55,7 +57,6 @@ class FetchNewsSourceJob implements ShouldQueue
 
             $result = $fetcher->fetchNewses();
 
-            // Step 8: Update API log with results
             $apiLog->update([
                 'status'           => 'success',
                 'articles_fetched' => $result['fetched'],
@@ -70,11 +71,10 @@ class FetchNewsSourceJob implements ShouldQueue
                 'articles_saved'   => $result['saved'],
             ]);
 
-            // Step 9: Update last_fetched_at on source
-            $this->source->update(['last_fetched_at' => $to]);
+            $this->endpoint->update(['last_fetched_at' => $to]);
 
-            $log->info('--- STEP 9: Source last_fetched_at updated ---', [
-                'source'          => $this->source->name,
+            $log->info('--- STEP 9: Endpoint last_fetched_at updated ---', [
+                'endpoint'        => $this->endpoint->endpoint,
                 'last_fetched_at' => $to,
             ]);
 
