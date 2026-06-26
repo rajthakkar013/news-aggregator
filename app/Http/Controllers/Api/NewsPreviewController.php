@@ -18,38 +18,57 @@ class NewsPreviewController extends Controller
         path: '/news/preview/newsapi',
         tags: ['News Fetch'],
         summary: 'Fetch live articles from NewsAPI.org',
-        description: 'Calls the NewsAPI.org /top-headlines endpoint with your parameters and returns mapped articles. Results are NOT saved to the database.',
+        description: 'Calls the NewsAPI.org /everything endpoint with your parameters and returns mapped articles. Results are NOT saved to the database.',
         parameters: [
             new OA\Parameter(
                 name: 'q',
                 in: 'query',
                 required: false,
-                description: 'Keywords to search for in article title/description',
-                schema: new OA\Schema(type: 'string', example: 'technology')
-            ),
-            new OA\Parameter(
-                name: 'country',
-                in: 'query',
-                required: false,
-                description: '2-letter ISO country code (e.g. us, gb, in). Cannot be used with sources.',
-                schema: new OA\Schema(type: 'string', example: 'us')
-            ),
-            new OA\Parameter(
-                name: 'category',
-                in: 'query',
-                required: false,
-                description: 'News category',
-                schema: new OA\Schema(
-                    type: 'string',
-                    enum: ['business', 'entertainment', 'general', 'health', 'science', 'sports', 'technology']
-                )
+                description: 'Keywords or phrases to search in article title and body',
+                schema: new OA\Schema(type: 'string', example: 'artificial intelligence')
             ),
             new OA\Parameter(
                 name: 'sources',
                 in: 'query',
                 required: false,
-                description: 'Comma-separated news source IDs (e.g. bbc-news,cnn). Cannot be used with country/category.',
+                description: 'Comma-separated news source IDs (e.g. bbc-news,cnn)',
                 schema: new OA\Schema(type: 'string', example: 'bbc-news')
+            ),
+            new OA\Parameter(
+                name: 'language',
+                in: 'query',
+                required: false,
+                description: '2-letter ISO language code (default: en)',
+                schema: new OA\Schema(
+                    type: 'string',
+                    enum: ['ar', 'de', 'en', 'es', 'fr', 'he', 'it', 'nl', 'no', 'pt', 'ru', 'sv', 'ud', 'zh'],
+                    example: 'en'
+                )
+            ),
+            new OA\Parameter(
+                name: 'sortBy',
+                in: 'query',
+                required: false,
+                description: 'Sort order (default: publishedAt)',
+                schema: new OA\Schema(
+                    type: 'string',
+                    enum: ['relevancy', 'popularity', 'publishedAt'],
+                    example: 'publishedAt'
+                )
+            ),
+            new OA\Parameter(
+                name: 'from',
+                in: 'query',
+                required: false,
+                description: 'Oldest article date (ISO 8601, e.g. 2025-01-01 or 2025-01-01T00:00:00)',
+                schema: new OA\Schema(type: 'string', example: '2025-01-01')
+            ),
+            new OA\Parameter(
+                name: 'to',
+                in: 'query',
+                required: false,
+                description: 'Newest article date (ISO 8601)',
+                schema: new OA\Schema(type: 'string', example: '2025-12-31')
             ),
             new OA\Parameter(
                 name: 'pageSize',
@@ -185,7 +204,7 @@ class NewsPreviewController extends Controller
         $requestConfig = $source->request_config;
 
         $userParams = \array_filter(
-            $request->only(['q', 'country', 'category', 'language', 'sources', 'domain', 'pageSize', 'page']),
+            $request->only(['q', 'sources', 'language', 'sortBy', 'from', 'to', 'country', 'category', 'domain', 'pageSize', 'page']),
             fn($v) => $v !== null && $v !== ''
         );
 

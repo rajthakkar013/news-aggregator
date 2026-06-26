@@ -357,55 +357,88 @@
                     "News Fetch"
                 ],
                 "summary": "Fetch live articles from NewsAPI.org",
-                "description": "Calls the NewsAPI.org /top-headlines endpoint with your parameters and returns mapped articles. Results are NOT saved to the database.",
+                "description": "Calls the NewsAPI.org /everything endpoint with your parameters and returns mapped articles. Results are NOT saved to the database.",
                 "operationId": "e5d3b8fc039e910b0a1d5c8a571962bb",
                 "parameters": [
                     {
                         "name": "q",
                         "in": "query",
-                        "description": "Keywords to search for in article title/description",
+                        "description": "Keywords or phrases to search in article title and body",
                         "required": false,
                         "schema": {
                             "type": "string",
-                            "example": "technology"
-                        }
-                    },
-                    {
-                        "name": "country",
-                        "in": "query",
-                        "description": "2-letter ISO country code (e.g. us, gb, in). Cannot be used with sources.",
-                        "required": false,
-                        "schema": {
-                            "type": "string",
-                            "example": "us"
-                        }
-                    },
-                    {
-                        "name": "category",
-                        "in": "query",
-                        "description": "News category",
-                        "required": false,
-                        "schema": {
-                            "type": "string",
-                            "enum": [
-                                "business",
-                                "entertainment",
-                                "general",
-                                "health",
-                                "science",
-                                "sports",
-                                "technology"
-                            ]
+                            "example": "artificial intelligence"
                         }
                     },
                     {
                         "name": "sources",
                         "in": "query",
-                        "description": "Comma-separated news source IDs (e.g. bbc-news,cnn). Cannot be used with country/category.",
+                        "description": "Comma-separated news source IDs (e.g. bbc-news,cnn)",
                         "required": false,
                         "schema": {
                             "type": "string",
                             "example": "bbc-news"
+                        }
+                    },
+                    {
+                        "name": "language",
+                        "in": "query",
+                        "description": "2-letter ISO language code (default: en)",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "example": "en",
+                            "enum": [
+                                "ar",
+                                "de",
+                                "en",
+                                "es",
+                                "fr",
+                                "he",
+                                "it",
+                                "nl",
+                                "no",
+                                "pt",
+                                "ru",
+                                "sv",
+                                "ud",
+                                "zh"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "sortBy",
+                        "in": "query",
+                        "description": "Sort order (default: publishedAt)",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "example": "publishedAt",
+                            "enum": [
+                                "relevancy",
+                                "popularity",
+                                "publishedAt"
+                            ]
+                        }
+                    },
+                    {
+                        "name": "from",
+                        "in": "query",
+                        "description": "Oldest article date (ISO 8601, e.g. 2025-01-01 or 2025-01-01T00:00:00)",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "example": "2025-01-01"
+                        }
+                    },
+                    {
+                        "name": "to",
+                        "in": "query",
+                        "description": "Newest article date (ISO 8601)",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "example": "2025-12-31"
                         }
                     },
                     {

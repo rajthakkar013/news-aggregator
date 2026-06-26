@@ -2,8 +2,10 @@
 
 namespace App\Services;
 
+use App\Helpers\SourceParameterHelper;
 use App\Models\Article;
 use App\Models\NewsApiSource;
+use Carbon\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 use Psr\Log\LoggerInterface;
@@ -15,17 +17,33 @@ class NewsApiFetcherService
     private array           $requestConfig;
     private array           $params;
     private string          $url;
+    private Carbon          $from;
+    private Carbon          $to;
 
     public function __construct(private readonly NewsApiSource $source)
     {
         $this->log           = Log::channel($source->slug);
         $this->credentials   = $source->credentials;
         $this->requestConfig = $source->request_config;
-        $this->url           = rtrim($source->base_url, '/') . $this->requestConfig['endpoint'];
-        $this->params        = [
+        $this->url  = rtrim($source->base_url, '/') . $this->requestConfig['endpoint'];
+        $this->from = $source->last_fetched_at
+            ? Carbon::instance($source->last_fetched_at)
+            : now()->subHour();
+        $this->to   = now();
+        $this->params = [
             ...(array) ($this->requestConfig['default_params'] ?? []),
+            ...SourceParameterHelper::addSourceParameters($source, $this->from, $this->to),
             $this->credentials['param_name'] => $this->credentials['api_key'],
         ];
+    }
+
+    public function getFrom(): Carbon { return $this->from; }
+    public function getTo(): Carbon   { return $this->to; }
+
+    public function getRequestParams(): array
+    {
+        $keyParam = $this->credentials['param_name'];
+        return \array_filter($this->params, fn($k) => $k !== $keyParam, ARRAY_FILTER_USE_KEY);
     }
 
     public function fetchNewses(): array
