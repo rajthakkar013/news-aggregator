@@ -72,12 +72,19 @@
                 </select>
             </div>
 
+            {{-- Searchable author picker --}}
             <div class="flex-1 min-w-36">
                 <label class="block text-xs text-gray-500 mb-1">Author</label>
-                <select id="f-author"
-                    class="w-full border border-gray-300 rounded px-3 py-1.5 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400 bg-white">
-                    <option value="">All authors</option>
-                </select>
+                <div class="relative" id="author-picker">
+                    <input id="f-author-input" type="text" placeholder="Search authors…" autocomplete="off"
+                        class="w-full border border-gray-300 rounded px-3 py-1.5 pr-7 text-sm focus:outline-none focus:ring-1 focus:ring-blue-400">
+                    <button id="f-author-clear" type="button" title="Clear"
+                        class="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 hidden leading-none text-xl">&times;</button>
+                    <input id="f-author" type="hidden" value="">
+                    <div id="author-dropdown"
+                        class="absolute z-20 left-0 right-0 mt-1 bg-white border border-gray-200 rounded shadow-lg max-h-52 overflow-y-auto hidden text-sm">
+                    </div>
+                </div>
             </div>
 
             <div class="flex items-end gap-2">
@@ -105,7 +112,6 @@
 <script>
 const API_BASE = '/api';
 let currentPage = 1;
-let allSources  = [];
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -145,73 +151,70 @@ function buildQuery(params) {
         .join('&');
 }
 
-// ── source picker ─────────────────────────────────────────────────────────────
+// ── searchable picker factory ─────────────────────────────────────────────────
+// toLabel(item) → string displayed and stored as the filter value
 
-function initSourcePicker(sources) {
-    allSources = sources;
+function makePicker(inputId, hiddenId, dropdownId, clearId, toLabel) {
+    let items = [];
 
-    const input    = document.getElementById('f-source-input');
-    const hidden   = document.getElementById('f-source');
-    const dropdown = document.getElementById('source-dropdown');
-    const clearBtn = document.getElementById('f-source-clear');
+    const input    = document.getElementById(inputId);
+    const hidden   = document.getElementById(hiddenId);
+    const dropdown = document.getElementById(dropdownId);
+    const clearBtn = document.getElementById(clearId);
 
-    function renderDropdown(items) {
-        if (!items.length) {
-            dropdown.innerHTML = '<div class="px-3 py-2 text-gray-400 text-xs">No sources match</div>';
-        } else {
-            dropdown.innerHTML = items.map(s =>
-                `<div class="px-3 py-2 cursor-pointer hover:bg-blue-50 truncate"
-                      data-name="${s.name.replace(/"/g, '&quot;')}">${s.name}</div>`
-            ).join('');
-        }
+    function render(list) {
+        dropdown.innerHTML = list.length
+            ? list.map(item => {
+                const label = toLabel(item);
+                return `<div class="px-3 py-2 cursor-pointer hover:bg-blue-50 truncate"
+                              data-value="${label.replace(/"/g, '&quot;')}">${label}</div>`;
+              }).join('')
+            : '<div class="px-3 py-2 text-gray-400 text-xs">No matches</div>';
         dropdown.classList.remove('hidden');
     }
 
-    function hideDropdown() {
-        dropdown.classList.add('hidden');
-    }
+    function hide() { dropdown.classList.add('hidden'); }
 
     input.addEventListener('focus', () => {
-        const val = input.value.trim().toLowerCase();
-        renderDropdown(val
-            ? allSources.filter(s => s.name.toLowerCase().includes(val))
-            : allSources);
+        const q = input.value.trim().toLowerCase();
+        render(q ? items.filter(i => toLabel(i).toLowerCase().includes(q)) : items);
     });
 
     input.addEventListener('input', () => {
         hidden.value = '';
         clearBtn.classList.add('hidden');
-        const val = input.value.trim().toLowerCase();
-        renderDropdown(val
-            ? allSources.filter(s => s.name.toLowerCase().includes(val))
-            : allSources);
+        const q = input.value.trim().toLowerCase();
+        render(q ? items.filter(i => toLabel(i).toLowerCase().includes(q)) : items);
     });
 
-    // mousedown fires before blur so we capture the click before the input blurs
+    // mousedown fires before blur so the click is captured before the input blurs
     dropdown.addEventListener('mousedown', e => {
-        const item = e.target.closest('[data-name]');
-        if (!item) return;
+        const el = e.target.closest('[data-value]');
+        if (!el) return;
         e.preventDefault();
-        input.value  = item.dataset.name;
-        hidden.value = item.dataset.name;
+        input.value = hidden.value = el.dataset.value;
         clearBtn.classList.remove('hidden');
-        hideDropdown();
+        hide();
     });
 
     clearBtn.addEventListener('click', () => {
-        input.value  = '';
-        hidden.value = '';
+        input.value = hidden.value = '';
         clearBtn.classList.add('hidden');
     });
 
-    input.addEventListener('blur', () => setTimeout(hideDropdown, 150));
+    input.addEventListener('blur', () => setTimeout(hide, 150));
+
+    return {
+        init(newItems) { items = newItems; },
+        reset() {
+            input.value = hidden.value = '';
+            clearBtn.classList.add('hidden');
+        },
+    };
 }
 
-function resetSourcePicker() {
-    document.getElementById('f-source-input').value = '';
-    document.getElementById('f-source').value        = '';
-    document.getElementById('f-source-clear').classList.add('hidden');
-}
+const sourcePicker = makePicker('f-source-input', 'f-source', 'source-dropdown', 'f-source-clear', s => s.name);
+const authorPicker = makePicker('f-author-input', 'f-author', 'author-dropdown', 'f-author-clear', a => a);
 
 // ── filter dropdowns ─────────────────────────────────────────────────────────
 
@@ -225,18 +228,14 @@ async function loadFilters() {
     const [{ data: sources }, { data: categories }, { data: authors }] =
         await Promise.all([sourcesRes.json(), categoriesRes.json(), authorsRes.json()]);
 
-    initSourcePicker(sources);
+    sourcePicker.init(sources);
+    authorPicker.init(authors);
 
     const categorySelect = document.getElementById('f-category');
-    const authorSelect   = document.getElementById('f-author');
 
     categories.forEach(c => {
         const label = String(c).charAt(0).toUpperCase() + String(c).slice(1);
         categorySelect.appendChild(new Option(label, c));
-    });
-
-    authors.forEach(a => {
-        authorSelect.appendChild(new Option(a, a));
     });
 }
 
@@ -362,9 +361,9 @@ document.getElementById('btn-reset').addEventListener('click', () => {
     document.getElementById('f-search').value   = '';
     document.getElementById('f-from').value     = yesterday();
     document.getElementById('f-to').value       = tomorrow();
-    resetSourcePicker();
+    sourcePicker.reset();
     document.getElementById('f-category').value = '';
-    document.getElementById('f-author').value   = '';
+    authorPicker.reset();
     currentPage = 1;
     loadArticles();
 });

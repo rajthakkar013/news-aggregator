@@ -18,15 +18,9 @@ class FilterController extends Controller
         responses: [
             new OA\Response(
                 response: 200,
-                description: 'List of sources',
+                description: 'List of active publisher sources',
                 content: new OA\JsonContent(properties: [
-                    new OA\Property(property: 'data', type: 'array', items: new OA\Items(
-                        properties: [
-                            new OA\Property(property: 'id',          type: 'integer'),
-                            new OA\Property(property: 'name',        type: 'string'),
-                            new OA\Property(property: 'external_id', type: 'string'),
-                        ]
-                    )),
+                    new OA\Property(property: 'data', type: 'array', items: new OA\Items(ref: '#/components/schemas/NewsSource')),
                 ])
             ),
         ]

@@ -8,9 +8,35 @@ use App\Models\CronLog;
 use App\Models\NewsApiEndpoint;
 use App\Models\NewsApiSource;
 use Illuminate\Http\JsonResponse;
+use OpenApi\Attributes as OA;
 
 class NewsFetchController extends Controller
 {
+    #[OA\Post(
+        path: '/news/fetch',
+        tags: ['News Fetch'],
+        summary: 'Trigger fetch for all active sources',
+        description: 'Dispatches background jobs for every active article endpoint. Returns immediately (HTTP 202) after queuing; articles are saved asynchronously.',
+        responses: [
+            new OA\Response(
+                response: 202,
+                description: 'Jobs dispatched',
+                content: new OA\JsonContent(properties: [
+                    new OA\Property(property: 'message',     type: 'string',  example: '2 endpoint(s) dispatched'),
+                    new OA\Property(property: 'cron_log_id', type: 'integer', example: 1),
+                    new OA\Property(property: 'dispatched',  type: 'array',   items: new OA\Items(
+                        properties: [
+                            new OA\Property(property: 'endpoint_id', type: 'integer', example: 1),
+                            new OA\Property(property: 'source',      type: 'string',  example: 'NewsAPI'),
+                            new OA\Property(property: 'endpoint',    type: 'string',  example: '/everything'),
+                            new OA\Property(property: 'queue',       type: 'string',  example: 'newsapi'),
+                        ]
+                    )),
+                ])
+            ),
+            new OA\Response(response: 422, description: 'No active article endpoints found'),
+        ]
+    )]
     public function fetchAll(): JsonResponse
     {
         $endpoints = NewsApiEndpoint::with('source')
@@ -55,6 +81,35 @@ class NewsFetchController extends Controller
         ], 202);
     }
 
+    #[OA\Post(
+        path: '/news/fetch/{slug}',
+        tags: ['News Fetch'],
+        summary: 'Trigger fetch for a single source',
+        description: 'Dispatches background jobs for all active article endpoints belonging to the given source slug. Returns immediately (HTTP 202) after queuing.',
+        parameters: [
+            new OA\Parameter(name: 'slug', in: 'path', required: true, description: 'Source slug (e.g. newsapi, newsdata)', schema: new OA\Schema(type: 'string', example: 'newsapi')),
+        ],
+        responses: [
+            new OA\Response(
+                response: 202,
+                description: 'Jobs dispatched',
+                content: new OA\JsonContent(properties: [
+                    new OA\Property(property: 'message',     type: 'string',  example: '1 endpoint(s) dispatched for NewsAPI'),
+                    new OA\Property(property: 'cron_log_id', type: 'integer', example: 2),
+                    new OA\Property(property: 'source',      type: 'string',  example: 'NewsAPI'),
+                    new OA\Property(property: 'dispatched',  type: 'array',   items: new OA\Items(
+                        properties: [
+                            new OA\Property(property: 'endpoint_id', type: 'integer', example: 1),
+                            new OA\Property(property: 'endpoint',    type: 'string',  example: '/everything'),
+                            new OA\Property(property: 'queue',       type: 'string',  example: 'newsapi'),
+                        ]
+                    )),
+                ])
+            ),
+            new OA\Response(response: 404, description: 'Source not found or inactive'),
+            new OA\Response(response: 422, description: 'No active article endpoints for this source'),
+        ]
+    )]
     public function fetchOne(string $slug): JsonResponse
     {
         $source = NewsApiSource::where('slug', $slug)->where('is_active', true)->first();
