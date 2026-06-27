@@ -117,17 +117,73 @@
                 "tags": [
                     "Articles"
                 ],
-                "summary": "List all articles",
-                "description": "Returns a paginated list of articles. Supports filtering by source, language, sentiment, keyword search, and date range.",
+                "summary": "List articles",
+                "description": "Paginated article list. Supports full-text search and filtering by date, source, category, author, language, and sentiment. Multi-value filters accept comma-separated strings.",
                 "operationId": "20f46a4be21edb0179e4df7acaa45c18",
                 "parameters": [
                     {
+                        "name": "search",
+                        "in": "query",
+                        "description": "Search in title and description",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "from",
+                        "in": "query",
+                        "description": "Published on or after this date (Y-m-d)",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
+                        "name": "to",
+                        "in": "query",
+                        "description": "Published on or before this date (Y-m-d)",
+                        "required": false,
+                        "schema": {
+                            "type": "string",
+                            "format": "date"
+                        }
+                    },
+                    {
                         "name": "source_id",
                         "in": "query",
-                        "description": "Filter by news_api_source_id",
+                        "description": "Filter by provider ID (news_api_source_id)",
                         "required": false,
                         "schema": {
                             "type": "integer"
+                        }
+                    },
+                    {
+                        "name": "source_name",
+                        "in": "query",
+                        "description": "Filter by publisher name, comma-separated (e.g. BBC News,CNN)",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "category",
+                        "in": "query",
+                        "description": "Filter by category, comma-separated (e.g. technology,sports)",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
+                        }
+                    },
+                    {
+                        "name": "author",
+                        "in": "query",
+                        "description": "Filter by author, comma-separated",
+                        "required": false,
+                        "schema": {
+                            "type": "string"
                         }
                     },
                     {
@@ -149,38 +205,9 @@
                         }
                     },
                     {
-                        "name": "search",
-                        "in": "query",
-                        "description": "Search in title and description",
-                        "required": false,
-                        "schema": {
-                            "type": "string"
-                        }
-                    },
-                    {
-                        "name": "from",
-                        "in": "query",
-                        "description": "Published from date (Y-m-d)",
-                        "required": false,
-                        "schema": {
-                            "type": "string",
-                            "format": "date"
-                        }
-                    },
-                    {
-                        "name": "to",
-                        "in": "query",
-                        "description": "Published to date (Y-m-d)",
-                        "required": false,
-                        "schema": {
-                            "type": "string",
-                            "format": "date"
-                        }
-                    },
-                    {
                         "name": "per_page",
                         "in": "query",
-                        "description": "Results per page (default 15)",
+                        "description": "Results per page (default 15, max 100)",
                         "required": false,
                         "schema": {
                             "type": "integer"
@@ -347,6 +374,229 @@
                     },
                     "404": {
                         "description": "Cron log not found"
+                    }
+                }
+            }
+        },
+        "/filters/sources": {
+            "get": {
+                "tags": [
+                    "Filters"
+                ],
+                "summary": "List available sources",
+                "description": "Returns all active news publisher sources. Use the `name` field to populate a source filter dropdown.",
+                "operationId": "42633c0733324fc92f8012c00e6c7b45",
+                "responses": {
+                    "200": {
+                        "description": "List of active publisher sources",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "$ref": "#/components/schemas/NewsSource"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/filters/categories": {
+            "get": {
+                "tags": [
+                    "Filters"
+                ],
+                "summary": "List available categories",
+                "description": "Returns all distinct category values found in articles. Use these to populate a category filter dropdown.",
+                "operationId": "58c56f365285b9a8af987e4417aa3ef1",
+                "responses": {
+                    "200": {
+                        "description": "List of category strings",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/filters/authors": {
+            "get": {
+                "tags": [
+                    "Filters"
+                ],
+                "summary": "List available authors",
+                "description": "Returns all distinct author values found in articles. Use these to populate an author filter dropdown.",
+                "operationId": "78457dd1c1d22a5eb00263e64a0cbf7e",
+                "responses": {
+                    "200": {
+                        "description": "List of author strings",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "/news/fetch": {
+            "post": {
+                "tags": [
+                    "News Fetch"
+                ],
+                "summary": "Trigger fetch for all active sources",
+                "description": "Dispatches background jobs for every active article endpoint. Returns immediately (HTTP 202) after queuing; articles are saved asynchronously.",
+                "operationId": "7a92f66275ea3d119c945752eadb9938",
+                "responses": {
+                    "202": {
+                        "description": "Jobs dispatched",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "2 endpoint(s) dispatched"
+                                        },
+                                        "cron_log_id": {
+                                            "type": "integer",
+                                            "example": 1
+                                        },
+                                        "dispatched": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "endpoint_id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "source": {
+                                                        "type": "string",
+                                                        "example": "NewsAPI"
+                                                    },
+                                                    "endpoint": {
+                                                        "type": "string",
+                                                        "example": "/everything"
+                                                    },
+                                                    "queue": {
+                                                        "type": "string",
+                                                        "example": "newsapi"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "No active article endpoints found"
+                    }
+                }
+            }
+        },
+        "/news/fetch/{slug}": {
+            "post": {
+                "tags": [
+                    "News Fetch"
+                ],
+                "summary": "Trigger fetch for a single source",
+                "description": "Dispatches background jobs for all active article endpoints belonging to the given source slug. Returns immediately (HTTP 202) after queuing.",
+                "operationId": "462088b1994d55b1c5c48925f8de7926",
+                "parameters": [
+                    {
+                        "name": "slug",
+                        "in": "path",
+                        "description": "Source slug (e.g. newsapi, newsdata)",
+                        "required": true,
+                        "schema": {
+                            "type": "string",
+                            "example": "newsapi"
+                        }
+                    }
+                ],
+                "responses": {
+                    "202": {
+                        "description": "Jobs dispatched",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "message": {
+                                            "type": "string",
+                                            "example": "1 endpoint(s) dispatched for NewsAPI"
+                                        },
+                                        "cron_log_id": {
+                                            "type": "integer",
+                                            "example": 2
+                                        },
+                                        "source": {
+                                            "type": "string",
+                                            "example": "NewsAPI"
+                                        },
+                                        "dispatched": {
+                                            "type": "array",
+                                            "items": {
+                                                "properties": {
+                                                    "endpoint_id": {
+                                                        "type": "integer",
+                                                        "example": 1
+                                                    },
+                                                    "endpoint": {
+                                                        "type": "string",
+                                                        "example": "/everything"
+                                                    },
+                                                    "queue": {
+                                                        "type": "string",
+                                                        "example": "newsapi"
+                                                    }
+                                                },
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "Source not found or inactive"
+                    },
+                    "422": {
+                        "description": "No active article endpoints for this source"
                     }
                 }
             }
@@ -827,6 +1077,50 @@
                 },
                 "type": "object"
             },
+            "NewsSource": {
+                "description": "An individual news publisher (e.g. BBC News, CNN) tracked per API provider.",
+                "properties": {
+                    "id": {
+                        "type": "integer",
+                        "example": 1
+                    },
+                    "external_id": {
+                        "type": "string",
+                        "example": "bbc-news",
+                        "nullable": true
+                    },
+                    "name": {
+                        "type": "string",
+                        "example": "BBC News"
+                    },
+                    "url": {
+                        "type": "string",
+                        "example": "https://www.bbc.com",
+                        "nullable": true
+                    },
+                    "icon": {
+                        "type": "string",
+                        "example": "https://…/icon.png",
+                        "nullable": true
+                    },
+                    "category": {
+                        "type": "string",
+                        "example": "general",
+                        "nullable": true
+                    },
+                    "language": {
+                        "type": "string",
+                        "example": "en",
+                        "nullable": true
+                    },
+                    "country": {
+                        "type": "string",
+                        "example": "gb",
+                        "nullable": true
+                    }
+                },
+                "type": "object"
+            },
             "NewsApiSource": {
                 "properties": {
                     "id": {
@@ -974,6 +1268,10 @@
         {
             "name": "Articles",
             "description": "Fetched news articles"
+        },
+        {
+            "name": "Filters",
+            "description": "Filter dropdown values for the frontend (sources, categories, authors)"
         },
         {
             "name": "Sources",

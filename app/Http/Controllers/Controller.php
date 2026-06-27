@@ -13,6 +13,7 @@ use OpenApi\Attributes as OA;
 #[OA\Server(url: '/api', description: 'API Server')]
 #[OA\Tag(name: 'News Fetch', description: 'Trigger news fetching from third-party APIs')]
 #[OA\Tag(name: 'Articles',  description: 'Fetched news articles')]
+#[OA\Tag(name: 'Filters',   description: 'Filter dropdown values for the frontend (sources, categories, authors)')]
 #[OA\Tag(name: 'Sources',   description: 'Third-party news API source configurations')]
 #[OA\Tag(name: 'Cron Logs', description: 'Cron execution history')]
 #[OA\Tag(name: 'API Logs',  description: 'Per-source API fetch logs')]
@@ -45,6 +46,20 @@ use OpenApi\Attributes as OA;
         new OA\Property(property: 'country',             type: 'array',    items: new OA\Items(type: 'string'), nullable: true),
         new OA\Property(property: 'sentiment',           type: 'string',   nullable: true),
         new OA\Property(property: 'created_at',          type: 'string',   format: 'date-time'),
+    ]
+)]
+#[OA\Schema(
+    schema: 'NewsSource',
+    description: 'An individual news publisher (e.g. BBC News, CNN) tracked per API provider.',
+    properties: [
+        new OA\Property(property: 'id',          type: 'integer', example: 1),
+        new OA\Property(property: 'external_id', type: 'string',  example: 'bbc-news',              nullable: true),
+        new OA\Property(property: 'name',        type: 'string',  example: 'BBC News'),
+        new OA\Property(property: 'url',         type: 'string',  example: 'https://www.bbc.com',   nullable: true),
+        new OA\Property(property: 'icon',        type: 'string',  example: 'https://…/icon.png',    nullable: true),
+        new OA\Property(property: 'category',    type: 'string',  example: 'general',               nullable: true),
+        new OA\Property(property: 'language',    type: 'string',  example: 'en',                    nullable: true),
+        new OA\Property(property: 'country',     type: 'string',  example: 'gb',                    nullable: true),
     ]
 )]
 #[OA\Schema(
