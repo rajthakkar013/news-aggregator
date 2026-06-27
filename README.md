@@ -385,6 +385,16 @@ php artisan queue:flush
 
 ---
 
+## Before Going to Production
+
+Items intentionally left in development mode that must be changed before deploying.
+
+| # | File | Line | What to do |
+|---|---|---|---|
+| 1 | `app/Jobs/FetchNewsSourceJob.php` | `->take(5)` | Remove the `->take(5)` limit so all active sources are fetched, not just the first 5 |
+
+---
+
 ## Clearing Data
 
 Use this command to reset all fetched data and log files during development or testing.

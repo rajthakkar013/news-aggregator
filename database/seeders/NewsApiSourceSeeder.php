@@ -36,12 +36,6 @@ class NewsApiSourceSeeder extends Seeder
                 'endpoint'       => '/everything',
                 'request_config' => [
                     'method'          => 'GET',
-                    'default_params'  => [
-                        'q'        => 'world OR technology OR business OR sports',
-                        'language' => 'en',
-                        'sortBy'   => 'publishedAt',
-                        'pageSize' => 20,
-                    ],
                     'date_from_param' => 'from',
                     'date_to_param'   => 'to',
                     'date_format'     => 'Y-m-d\TH:i:s',
@@ -106,10 +100,7 @@ class NewsApiSourceSeeder extends Seeder
                 'type'           => 'articles',
                 'endpoint'       => '/latest',
                 'request_config' => [
-                    'method'          => 'GET',
-                    'date_from_param' => 'from_date',
-                    'date_to_param'   => 'to_date',
-                    'date_format'     => 'Y-m-d',
+                    'method' => 'GET',
                 ],
                 'status_param'   => 'status',
                 'success_status' => 'success',
