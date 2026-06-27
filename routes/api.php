@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\ApiLogController;
 use App\Http\Controllers\Api\ArticleController;
 use App\Http\Controllers\Api\CronLogController;
+use App\Http\Controllers\Api\FilterController;
 use App\Http\Controllers\Api\NewsFetchController;
 use App\Http\Controllers\Api\NewsPreviewController;
 use App\Http\Controllers\Api\SourceController;
@@ -16,6 +17,12 @@ Route::get('/news/preview/newsdata', [NewsPreviewController::class, 'newsdata'])
 
 Route::get('/articles',       [ArticleController::class, 'index']);
 Route::get('/articles/{id}',  [ArticleController::class, 'show']);
+
+Route::prefix('filters')->group(function () {
+    Route::get('/sources',    [FilterController::class, 'sources']);
+    Route::get('/categories', [FilterController::class, 'categories']);
+    Route::get('/authors',    [FilterController::class, 'authors']);
+});
 
 Route::get('/sources',        [SourceController::class, 'index']);
 Route::get('/sources/{id}',   [SourceController::class, 'show']);
