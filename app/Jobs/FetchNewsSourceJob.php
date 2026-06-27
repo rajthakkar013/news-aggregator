@@ -3,92 +3,118 @@
 namespace App\Jobs;
 
 use App\Models\ApiLog;
-use App\Models\NewsApiSource;
-use App\Services\NewsApiFetcherService;
+use App\Models\NewsApiEndpoint;
+use App\Models\NewsSource;
+use Carbon\Carbon;
+use Illuminate\Bus\Batch;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
+use Illuminate\Support\Facades\Bus;
 use Illuminate\Support\Facades\Log;
-use Throwable;
 
 class FetchNewsSourceJob implements ShouldQueue
 {
     use Queueable;
 
     public function __construct(
-        public readonly NewsApiSource $source,
-        public readonly int $cronLogId,
+        public NewsApiEndpoint $endpoint,
+        public int $cronLogId,
     ) {}
 
     public function handle(): void
     {
-        $log     = Log::channel($this->source->slug);
-        $fetcher = new NewsApiFetcherService($this->source);
-        $from    = $fetcher->getFrom();
-        $to      = $fetcher->getTo();
+        $source = $this->endpoint->source;
+        $log    = Log::channel($source->slug);
 
-        $log->info('--- STEP 1: Job picked up from queue ---', [
-            'source'      => $this->source->name,
-            'slug'        => $this->source->slug,
-            'queue'       => $this->queue,
+        $log->info('--- COORDINATOR: Job picked up ---', [
+            'source'      => $source->name,
+            'endpoint'    => $this->endpoint->endpoint,
             'cron_log_id' => $this->cronLogId,
         ]);
 
+        // TODO: remove take(5) before production
+        $allSources = NewsSource::where('news_api_source_id', $source->id)
+            ->where('is_active', true)
+            ->take(5)
+            ->get();
+
+        if ($allSources->isEmpty()) {
+            $log->warning('No active sources found — skipping. Run news:fetch-sources first.');
+            return;
+        }
+
+        $totalJobs  = $allSources->count();
+        $refFrom    = $this->endpoint->last_fetched_at
+            ? Carbon::instance($this->endpoint->last_fetched_at)
+            : now()->subHour();
+        $refTo      = now();
+
         $apiLog = ApiLog::create([
             'cron_log_id'        => $this->cronLogId,
-            'news_api_source_id' => $this->source->id,
+            'news_api_source_id' => $source->id,
             'status'             => 'pending',
-            'from_date'          => $from,
-            'to_date'            => $to,
-            'request_params'     => $fetcher->getRequestParams(),
+            'from_date'          => $refFrom,
+            'to_date'            => $refTo,
+            'articles_fetched'   => 0,
+            'articles_saved'     => 0,
             'started_at'         => now(),
         ]);
 
-        $log->info('--- STEP 2: API log created ---', [
-            'api_log_id'     => $apiLog->id,
-            'from_date'      => $from,
-            'to_date'        => $to,
-            'request_params' => $fetcher->getRequestParams(),
+        $log->info('--- COORDINATOR: API log created, building batch ---', [
+            'api_log_id'   => $apiLog->id,
+            'total_sources' => $totalJobs,
         ]);
 
-        try {
-            $log->info('--- STEP 3: Dispatching to fetcher service ---');
+        $jobNum    = 0;
+        $batchJobs = [];
 
-            $result = $fetcher->fetchNewses();
-
-            // Step 8: Update API log with results
-            $apiLog->update([
-                'status'           => 'success',
-                'articles_fetched' => $result['fetched'],
-                'articles_saved'   => $result['saved'],
-                'finished_at'      => now(),
-            ]);
-
-            $log->info('--- STEP 8: API log updated ---', [
-                'api_log_id'       => $apiLog->id,
-                'status'           => 'success',
-                'articles_fetched' => $result['fetched'],
-                'articles_saved'   => $result['saved'],
-            ]);
-
-            // Step 9: Update last_fetched_at on source
-            $this->source->update(['last_fetched_at' => $to]);
-
-            $log->info('--- STEP 9: Source last_fetched_at updated ---', [
-                'source'          => $this->source->name,
-                'last_fetched_at' => $to,
-            ]);
-
-        } catch (Throwable $e) {
-            $apiLog->update([
-                'status'        => 'failed',
-                'error_message' => $e->getMessage(),
-                'finished_at'   => now(),
-            ]);
-
-            $log->error('--- JOB FAILED ---', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-            ]);
+        foreach ($allSources as $newsSource) {
+            $batchJobs[] = new FetchNewsSourceBatchJob(
+                endpointId: $this->endpoint->id,
+                sourceId:   $newsSource->id,
+                apiLogId:   $apiLog->id,
+                jobNum:     ++$jobNum,
+                totalJobs:  $totalJobs,
+            );
         }
+
+        $endpointId = $this->endpoint->id;
+        $apiLogId   = $apiLog->id;
+        $slug       = $source->slug;
+
+        Bus::batch($batchJobs)
+            ->name("{$slug}:{$this->endpoint->endpoint}")
+            ->catch(function (Batch $batch, \Throwable $e) use ($slug) {
+                Log::channel($slug)->error('--- SOURCE JOB FAILED ---', [
+                    'batch_id' => $batch->id,
+                    'error'    => $e->getMessage(),
+                ]);
+            })
+            ->finally(function (Batch $batch) use ($endpointId, $apiLogId, $slug) {
+                $status = $batch->failedJobs > 0 ? 'failed' : 'success';
+
+                ApiLog::find($apiLogId)?->update([
+                    'status'      => $status,
+                    'finished_at' => now(),
+                ]);
+
+                if ($batch->failedJobs === 0) {
+                    NewsApiEndpoint::find($endpointId)?->update(['last_fetched_at' => now()]);
+                }
+
+                Log::channel($slug)->info('--- COORDINATOR: All source jobs processed ---', [
+                    'batch_id'    => $batch->id,
+                    'status'      => $status,
+                    'total_jobs'  => $batch->totalJobs,
+                    'failed_jobs' => $batch->failedJobs,
+                ]);
+            })
+            ->onQueue($slug)
+            ->dispatch();
+
+        $log->info('--- COORDINATOR: Batch dispatched ---', [
+            'total_source_jobs' => $totalJobs,
+            'queue'             => $slug,
+        ]);
     }
 }

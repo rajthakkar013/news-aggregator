@@ -4,13 +4,13 @@ namespace App\Console\Commands;
 
 use App\Jobs\FetchNewsSourceJob;
 use App\Models\CronLog;
-use App\Models\NewsApiSource;
+use App\Models\NewsApiEndpoint;
 use Illuminate\Console\Command;
 
 class FetchNewsCommand extends Command
 {
-    protected $signature = 'news:fetch';
-    protected $description = 'Fetch news from all active API sources';
+    protected $signature   = 'news:fetch';
+    protected $description = 'Fetch news from all active article endpoints';
 
     public function handle(): void
     {
@@ -19,29 +19,35 @@ class FetchNewsCommand extends Command
             'started_at' => now(),
         ]);
 
-        $sources = NewsApiSource::where('is_active', true)->get();
+        $endpoints = NewsApiEndpoint::with('source')
+            ->where('type', 'articles')
+            ->where('is_active', true)
+            ->whereHas('source', fn($q) => $q->where('is_active', true))
+            ->get();
 
-        if ($sources->isEmpty()) {
+        if ($endpoints->isEmpty()) {
             $cronLog->update([
                 'status'      => 'completed',
                 'finished_at' => now(),
-                'notes'       => 'No active sources found.',
+                'notes'       => 'No active article endpoints found.',
             ]);
-            $this->info('No active sources found.');
+            $this->info('No active article endpoints found.');
             return;
         }
 
-        foreach ($sources as $source) {
-            FetchNewsSourceJob::dispatch($source, $cronLog->id)->onQueue($source->slug);
-            $this->info("Dispatched job for: {$source->name} on queue [{$source->slug}]");
+        foreach ($endpoints as $endpoint) {
+            FetchNewsSourceJob::dispatch($endpoint, $cronLog->id)
+                ->onQueue($endpoint->source->slug);
+
+            $this->info("Dispatched: {$endpoint->source->name} → {$endpoint->endpoint} on queue [{$endpoint->source->slug}]");
         }
 
         $cronLog->update([
             'status'            => 'completed',
-            'sources_triggered' => $sources->count(),
+            'sources_triggered' => $endpoints->count(),
             'finished_at'       => now(),
         ]);
 
-        $this->info("Cron completed. {$sources->count()} source(s) dispatched.");
+        $this->info("Cron completed. {$endpoints->count()} endpoint(s) dispatched.");
     }
 }

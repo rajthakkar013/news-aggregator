@@ -12,13 +12,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property string                $base_url
  * @property string                $auth_type
  * @property array<string, mixed>  $credentials
- * @property array<string, mixed>  $request_config
- * @property string                $status_param
- * @property string                $success_status
- * @property string                $results_param
- * @property array<string, mixed>|null $response_param
  * @property bool                  $is_active
- * @property \Carbon\Carbon|null   $last_fetched_at
  */
 class NewsApiSource extends Model
 {
@@ -28,22 +22,18 @@ class NewsApiSource extends Model
         'base_url',
         'auth_type',
         'credentials',
-        'request_config',
-        'status_param',
-        'success_status',
-        'results_param',
-        'response_param',
         'is_active',
-        'last_fetched_at',
     ];
 
     protected $casts = [
-        'credentials'    => 'encrypted:json',
-        'request_config' => 'array',
-        'response_param' => 'array',
-        'is_active'      => 'boolean',
-        'last_fetched_at' => 'datetime',
+        'credentials' => 'encrypted:json',
+        'is_active'   => 'boolean',
     ];
+
+    public function endpoints(): HasMany
+    {
+        return $this->hasMany(NewsApiEndpoint::class, 'news_api_source_id');
+    }
 
     public function articles(): HasMany
     {

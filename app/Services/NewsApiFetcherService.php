@@ -4,7 +4,8 @@ namespace App\Services;
 
 use App\Helpers\SourceParameterHelper;
 use App\Models\Article;
-use App\Models\NewsApiSource;
+use App\Models\NewsApiEndpoint;
+use App\Models\NewsSource;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -20,19 +21,21 @@ class NewsApiFetcherService
     private Carbon          $from;
     private Carbon          $to;
 
-    public function __construct(private readonly NewsApiSource $source)
-    {
+    public function __construct(
+        private readonly NewsApiEndpoint $endpoint,
+        ?Carbon $from = null,
+        ?Carbon $to = null,
+    ) {
+        $source              = $endpoint->source;
         $this->log           = Log::channel($source->slug);
         $this->credentials   = $source->credentials;
-        $this->requestConfig = $source->request_config;
-        $this->url  = rtrim($source->base_url, '/') . $this->requestConfig['endpoint'];
-        $this->from = $source->last_fetched_at
-            ? Carbon::instance($source->last_fetched_at)
-            : now()->subHour();
-        $this->to   = now();
-        $this->params = [
+        $this->requestConfig = $endpoint->request_config ?? [];
+        $this->url           = rtrim($source->base_url, '/') . $endpoint->endpoint;
+        $this->from          = $from ?? ($endpoint->last_fetched_at ? Carbon::instance($endpoint->last_fetched_at) : now()->subHour());
+        $this->to            = $to ?? now();
+        $this->params        = [
             ...(array) ($this->requestConfig['default_params'] ?? []),
-            ...SourceParameterHelper::addSourceParameters($source, $this->from, $this->to),
+            ...SourceParameterHelper::addSourceParameters($endpoint, $this->from, $this->to),
             $this->credentials['param_name'] => $this->credentials['api_key'],
         ];
     }
@@ -46,78 +49,71 @@ class NewsApiFetcherService
         return \array_filter($this->params, fn($k) => $k !== $keyParam, ARRAY_FILTER_USE_KEY);
     }
 
-    public function fetchNewses(): array
+    public function fetchSourceBatch(NewsSource $newsSource, int $jobNum, int $totalJobs): array
     {
-        $this->log->info('--- STEP 4: Starting fetch ---', [
-            'slug'           => $this->source->slug,
-            'success_status' => $this->source->success_status,
+        $source       = $this->endpoint->source;
+        $sourceParams = SourceParameterHelper::buildSourceFilterParam($this->endpoint, $newsSource);
+
+        // NewsAPI: 'sources' and 'q' are mutually exclusive — remove 'q' when sources is set.
+        $batchParams = $this->params;
+        if (isset($sourceParams['sources'])) {
+            unset($batchParams['q']);
+        }
+        $batchParams = array_merge($batchParams, $sourceParams);
+
+        $logParams = $batchParams;
+        $logParams[$this->credentials['param_name']] = '***';
+        $this->log->info("--- SOURCE {$jobNum}/{$totalJobs}: HTTP request ---", [
+            'source' => $newsSource->external_id,
+            'url'    => urldecode($this->url . '?' . http_build_query($logParams)),
         ]);
 
-        $this->log->info('--- STEP 5: Building HTTP request ---', [
-            'method'          => $this->requestConfig['method'] ?? 'GET',
-            'url'             => $this->url,
-            'param_keys'      => \array_keys($this->params),
-            'default_params'  => $this->requestConfig['default_params'] ?? [],
-            'auth_type'       => $this->source->auth_type,
-            'auth_param_name' => $this->credentials['param_name'],
-        ]);
+        echo $this->url . '?' . http_build_query($batchParams) . PHP_EOL;
+        $response = Http::get($this->url, $batchParams);
 
-        $response = Http::get($this->url, $this->params);
-
-        $this->log->info('--- STEP 6: HTTP response received ---', [
+        $this->log->info("--- SOURCE {$jobNum}/{$totalJobs}: Response received ---", [
             'http_status'   => $response->status(),
-            'successful'    => $response->successful(),
             'response_size' => \strlen($response->body()) . ' bytes',
+            'response_body' => substr($response->body(), 0, 300),
         ]);
 
         if (!$response->successful()) {
-            $this->log->error('Request failed', [
+            $this->log->error("SOURCE {$jobNum}: Request failed", [
                 'http_status' => $response->status(),
                 'body'        => $response->body(),
             ]);
-            throw new \RuntimeException("{$this->source->name} request failed: " . $response->body());
+            throw new \RuntimeException("{$source->name} request failed: " . $response->body());
         }
 
         $body           = $response->json();
-        $receivedStatus = $body[$this->source->status_param] ?? null;
+        $receivedStatus = $body[$this->endpoint->status_param] ?? null;
 
-        $this->log->info('--- STEP 6a: Checking API status field ---', [
-            'status_param'    => $this->source->status_param,
+        $this->log->info("--- SOURCE {$jobNum}/{$totalJobs}: Checking status ---", [
+            'status_param'    => $this->endpoint->status_param,
             'received_status' => $receivedStatus,
-            'expected_status' => $this->source->success_status,
-            'match'           => $receivedStatus === $this->source->success_status,
+            'expected_status' => $this->endpoint->success_status,
         ]);
 
-        if ($receivedStatus !== $this->source->success_status) {
+        if ($receivedStatus !== $this->endpoint->success_status) {
             $message = $body['results']['message'] ?? $body['message'] ?? 'Unknown error';
-            $this->log->error('API returned error status', ['message' => $message]);
-            throw new \RuntimeException("{$this->source->name} error: {$message}");
+            $this->log->error("SOURCE {$jobNum}: API error", ['message' => $message]);
+            throw new \RuntimeException("{$source->name} error: {$message}");
         }
 
-        $rawArticles = $body[$this->source->results_param] ?? [];
+        $rawArticles = $body[$this->endpoint->results_param] ?? [];
 
-        $this->log->info('--- STEP 6b: Extracting articles from response ---', [
-            'results_param'        => $this->source->results_param,
+        $this->log->info("--- SOURCE {$jobNum}/{$totalJobs}: Mapping articles ---", [
+            'results_param'        => $this->endpoint->results_param,
             'articles_in_response' => \count($rawArticles),
-            'total_results'        => $body['totalResults'] ?? $body['total_results'] ?? 'n/a',
         ]);
 
-        $this->log->info('--- STEP 7: Starting article mapping and save ---');
-
-        $result = $this->mapAndSaveArticles($rawArticles);
-
-        $this->log->info('--- STEP 7 complete ---', [
-            'fetched' => $result['fetched'],
-            'saved'   => $result['saved'],
-            'skipped' => $result['fetched'] - $result['saved'],
-        ]);
-
-        return $result;
+        return $this->mapAndSaveArticles($rawArticles, $jobNum);
     }
 
-    private function mapAndSaveArticles(array $rawArticles): array
+    private function mapAndSaveArticles(array $rawArticles, int $batchNum): array
     {
-        $responseParam = $this->source->response_param ?? [];
+        $source        = $this->endpoint->source;
+        $responseParam = $this->endpoint->response_param ?? [];
         $skip          = ['total_results', 'next_page'];
         $jsonFields    = ['keywords', 'country', 'category', 'ai_tag', 'sentiment_stats', 'ai_region', 'ai_org', 'symbol'];
 
@@ -126,7 +122,7 @@ class NewsApiFetcherService
 
         foreach ($rawArticles as $index => $raw) {
             $fetched++;
-            $mapped = ['news_api_source_id' => $this->source->id];
+            $mapped = ['news_api_source_id' => $source->id];
 
             foreach ($responseParam as $ourKey => $apiKey) {
                 if (\in_array($ourKey, $skip, true) || $apiKey === null) {
@@ -145,19 +141,15 @@ class NewsApiFetcherService
                 $mapped[$ourKey] = $value;
             }
 
-            $this->log->info("--- STEP 7.{$fetched}: Processing article ---", [
+            $this->log->info("SOURCE {$batchNum} · Article {$fetched}: Processing", [
                 'index'        => $index,
                 'title'        => $mapped['title'] ?? 'N/A',
                 'url'          => $mapped['url'] ?? 'MISSING',
-                'author'       => $mapped['author'] ?? null,
-                'source_name'  => $mapped['source_name'] ?? null,
                 'published_at' => $mapped['published_at'] ?? null,
-                'language'     => $mapped['language'] ?? null,
-                'mapped_keys'  => \array_keys($mapped),
             ]);
 
             if (empty($mapped['url'])) {
-                $this->log->warning("STEP 7.{$fetched}: Skipped — missing url", [
+                $this->log->warning("SOURCE {$batchNum} · Article {$fetched}: Skipped — missing url", [
                     'title' => $mapped['title'] ?? 'unknown',
                 ]);
                 continue;
@@ -165,16 +157,16 @@ class NewsApiFetcherService
 
             try {
                 $article = Article::updateOrCreate(['url' => $mapped['url']], $mapped);
+                $action  = $article->wasRecentlyCreated ? 'created' : 'updated';
 
-                $action = $article->wasRecentlyCreated ? 'created' : 'updated';
-                $this->log->info("STEP 7.{$fetched}: Article {$action}", [
+                $this->log->info("SOURCE {$batchNum} · Article {$fetched}: {$action}", [
                     'article_id' => $article->id,
                     'url'        => $mapped['url'],
                 ]);
 
                 $saved++;
             } catch (\Throwable $e) {
-                $this->log->error("STEP 7.{$fetched}: Failed to save article", [
+                $this->log->error("SOURCE {$batchNum} · Article {$fetched}: Save failed", [
                     'url'   => $mapped['url'],
                     'error' => $e->getMessage(),
                 ]);

@@ -101,9 +101,22 @@ php artisan migrate --force
 php artisan db:seed --class=NewsApiSourceSeeder
 ```
 
-This inserts the NewsAPI and NewsData.io source configurations (credentials, endpoints, field mappings) into the `news_api_sources` table.
+This inserts the NewsAPI and NewsData.io source configurations (credentials, endpoints, field mappings) into the `news_api_sources` and `news_api_endpoints` tables.
 
-### 6. Optimize for production
+### 6. Fetch news sources
+
+> **One-time setup step.** Populates the `news_sources` table with publisher/source records from each API. Only needs to be run once after seeding (or again if you want to refresh the sources list).
+
+```bash
+# Fetch sources from all active providers
+php artisan news:fetch-sources
+
+# Or fetch from a single provider only
+php artisan news:fetch-sources newsapi
+php artisan news:fetch-sources newsdata
+```
+
+### 7. Optimize for production
 
 ```bash
 php artisan config:cache
@@ -350,7 +363,14 @@ sudo supervisorctl reread && sudo supervisorctl update && sudo supervisorctl sta
 ## Manual Commands
 
 ```bash
-# Trigger a fetch manually (bypasses cron schedule)
+# Fetch news sources (publishers) — one-time setup, run once after seeding
+php artisan news:fetch-sources
+
+# Fetch sources from a single provider only
+php artisan news:fetch-sources newsapi
+php artisan news:fetch-sources newsdata
+
+# Trigger an article fetch manually (bypasses cron schedule)
 php artisan news:fetch
 
 # Process a single job from the newsapi queue (for testing)
@@ -362,6 +382,16 @@ php artisan schedule:list
 # Clear failed jobs
 php artisan queue:flush
 ```
+
+---
+
+## Before Going to Production
+
+Items intentionally left in development mode that must be changed before deploying.
+
+| # | File | Line | What to do |
+|---|---|---|---|
+| 1 | `app/Jobs/FetchNewsSourceJob.php` | `->take(5)` | Remove the `->take(5)` limit so all active sources are fetched, not just the first 5 |
 
 ---
 
@@ -382,7 +412,10 @@ php artisan news:clear --db-only
 
 > **What it clears:**
 > - `articles` table — all fetched news articles
+> - `news_sources` table — all fetched publisher/source records
 > - `cron_logs` table — all cron execution records
 > - `api_logs` table — all API fetch records
 > - `storage/logs/newsapi/*.log` — all NewsAPI log files
 > - `storage/logs/newsdata/*.log` — all NewsData log files
+>
+> After clearing, re-run `php artisan news:fetch-sources` to repopulate the sources table.
