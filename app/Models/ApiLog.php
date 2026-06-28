@@ -10,6 +10,7 @@ class ApiLog extends Model
     protected $fillable = [
         'cron_log_id',
         'news_api_source_id',
+        'news_source_id',
         'status',
         'articles_fetched',
         'articles_saved',
@@ -37,5 +38,10 @@ class ApiLog extends Model
     public function source(): BelongsTo
     {
         return $this->belongsTo(NewsApiSource::class, 'news_api_source_id');
+    }
+
+    public function newsSource(): BelongsTo
+    {
+        return $this->belongsTo(NewsSource::class, 'news_source_id');
     }
 }

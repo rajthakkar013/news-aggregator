@@ -93,6 +93,7 @@ use OpenApi\Attributes as OA;
         new OA\Property(property: 'id',                  type: 'integer', example: 1),
         new OA\Property(property: 'cron_log_id',         type: 'integer', example: 1),
         new OA\Property(property: 'news_api_source_id',  type: 'integer', example: 1),
+        new OA\Property(property: 'news_source_id',      type: 'integer', example: 5, nullable: true),
         new OA\Property(property: 'status',              type: 'string',  enum: ['pending', 'success', 'failed']),
         new OA\Property(property: 'articles_fetched',    type: 'integer', example: 20),
         new OA\Property(property: 'articles_saved',      type: 'integer', example: 18),

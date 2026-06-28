@@ -18,7 +18,7 @@ class NewsSourceFetcherService
     public function __construct(private readonly NewsApiEndpoint $endpoint)
     {
         $source            = $endpoint->source;
-        $this->log         = Log::channel($source->slug);
+        $this->log         = Log::channel('stack');
         $this->credentials = $source->credentials;
         $this->url         = rtrim($source->base_url, '/') . $endpoint->endpoint;
     }
