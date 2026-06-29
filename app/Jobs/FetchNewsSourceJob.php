@@ -2,10 +2,8 @@
 
 namespace App\Jobs;
 
-use App\Models\ApiLog;
 use App\Models\NewsApiEndpoint;
 use App\Models\NewsSource;
-use Carbon\Carbon;
 use Illuminate\Bus\Batch;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -32,10 +30,10 @@ class FetchNewsSourceJob implements ShouldQueue
             'cron_log_id' => $this->cronLogId,
         ]);
 
-        // TODO: remove take(5) before production
+        // TODO: remove take(2) before production
         $allSources = NewsSource::where('news_api_source_id', $source->id)
             ->where('is_active', true)
-            ->take(5)
+            ->take(2)
             ->get();
 
         if ($allSources->isEmpty()) {
@@ -43,25 +41,9 @@ class FetchNewsSourceJob implements ShouldQueue
             return;
         }
 
-        $totalJobs  = $allSources->count();
-        $refFrom    = $this->endpoint->last_fetched_at
-            ? Carbon::instance($this->endpoint->last_fetched_at)
-            : now()->subHour();
-        $refTo      = now();
+        $totalJobs = $allSources->count();
 
-        $apiLog = ApiLog::create([
-            'cron_log_id'        => $this->cronLogId,
-            'news_api_source_id' => $source->id,
-            'status'             => 'pending',
-            'from_date'          => $refFrom,
-            'to_date'            => $refTo,
-            'articles_fetched'   => 0,
-            'articles_saved'     => 0,
-            'started_at'         => now(),
-        ]);
-
-        $log->info('--- COORDINATOR: API log created, building batch ---', [
-            'api_log_id'   => $apiLog->id,
+        $log->info('--- COORDINATOR: Building batch ---', [
             'total_sources' => $totalJobs,
         ]);
 
@@ -72,14 +54,13 @@ class FetchNewsSourceJob implements ShouldQueue
             $batchJobs[] = new FetchNewsSourceBatchJob(
                 endpointId: $this->endpoint->id,
                 sourceId:   $newsSource->id,
-                apiLogId:   $apiLog->id,
+                cronLogId:  $this->cronLogId,
                 jobNum:     ++$jobNum,
                 totalJobs:  $totalJobs,
             );
         }
 
         $endpointId = $this->endpoint->id;
-        $apiLogId   = $apiLog->id;
         $slug       = $source->slug;
 
         Bus::batch($batchJobs)
@@ -90,21 +71,14 @@ class FetchNewsSourceJob implements ShouldQueue
                     'error'    => $e->getMessage(),
                 ]);
             })
-            ->finally(function (Batch $batch) use ($endpointId, $apiLogId, $slug) {
-                $status = $batch->failedJobs > 0 ? 'failed' : 'success';
-
-                ApiLog::find($apiLogId)?->update([
-                    'status'      => $status,
-                    'finished_at' => now(),
-                ]);
-
+            ->finally(function (Batch $batch) use ($endpointId, $slug) {
                 if ($batch->failedJobs === 0) {
                     NewsApiEndpoint::find($endpointId)?->update(['last_fetched_at' => now()]);
                 }
 
                 Log::channel($slug)->info('--- COORDINATOR: All source jobs processed ---', [
                     'batch_id'    => $batch->id,
-                    'status'      => $status,
+                    'status'      => $batch->failedJobs > 0 ? 'failed' : 'success',
                     'total_jobs'  => $batch->totalJobs,
                     'failed_jobs' => $batch->failedJobs,
                 ]);

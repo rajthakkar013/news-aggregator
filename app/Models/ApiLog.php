@@ -4,12 +4,14 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ApiLog extends Model
 {
     protected $fillable = [
         'cron_log_id',
         'news_api_source_id',
+        'news_source_id',
         'status',
         'articles_fetched',
         'articles_saved',
@@ -37,5 +39,15 @@ class ApiLog extends Model
     public function source(): BelongsTo
     {
         return $this->belongsTo(NewsApiSource::class, 'news_api_source_id');
+    }
+
+    public function newsSource(): BelongsTo
+    {
+        return $this->belongsTo(NewsSource::class, 'news_source_id');
+    }
+
+    public function paginationLogs(): HasMany
+    {
+        return $this->hasMany(PaginationLog::class);
     }
 }

@@ -391,7 +391,7 @@ Items intentionally left in development mode that must be changed before deployi
 
 | # | File | Line | What to do |
 |---|---|---|---|
-| 1 | `app/Jobs/FetchNewsSourceJob.php` | `->take(5)` | Remove the `->take(5)` limit so all active sources are fetched, not just the first 5 |
+| 1 | `app/Jobs/FetchNewsSourceJob.php` | `->take(2)` | Remove the `->take(2)` limit so all active sources are fetched, not just the first 2 |
 
 ---
 

@@ -1216,6 +1216,11 @@
                         "type": "integer",
                         "example": 1
                     },
+                    "news_source_id": {
+                        "type": "integer",
+                        "example": 5,
+                        "nullable": true
+                    },
                     "status": {
                         "type": "string",
                         "enum": [

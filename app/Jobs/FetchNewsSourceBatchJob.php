@@ -19,7 +19,7 @@ class FetchNewsSourceBatchJob implements ShouldQueue
     public function __construct(
         public int $endpointId,
         public int $sourceId,
-        public int $apiLogId,
+        public int $cronLogId,
         public int $jobNum,
         public int $totalJobs,
     ) {}
@@ -34,12 +34,16 @@ class FetchNewsSourceBatchJob implements ShouldQueue
         $newsSource = NewsSource::findOrFail($this->sourceId);
         $log        = Log::channel($endpoint->source->slug);
 
-        // Per-source from: use this source's own last_fetch_at, fall back to
-        // endpoint's last_fetched_at, then default to 1 hour ago.
-        $from = $newsSource->last_fetch_at
-            ?? $endpoint->last_fetched_at
-            ?? now()->subHour();
-        $from = Carbon::instance($from);
+        // Per-source from: last successful api_log to_date for this source,
+        // or start of yesterday if no prior log exists.
+        $lastLog = ApiLog::where('news_source_id', $newsSource->id)
+            ->where('status', 'success')
+            ->latest('to_date')
+            ->first();
+
+        $from = $lastLog
+            ? Carbon::instance($lastLog->to_date)
+            : now()->subDay()->startOfDay();
         $to   = now();
 
         $log->info("--- SOURCE {$this->jobNum}/{$this->totalJobs}: Job started ---", [
@@ -49,19 +53,47 @@ class FetchNewsSourceBatchJob implements ShouldQueue
             'to'         => $to->toIso8601String(),
         ]);
 
-        $service = new NewsApiFetcherService($endpoint, $from, $to);
-        $result  = $service->fetchSourceBatch($newsSource, $this->jobNum, $this->totalJobs);
-
-        $newsSource->update(['last_fetch_at' => $to]);
-
-        $apiLog = ApiLog::find($this->apiLogId);
-        $apiLog?->increment('articles_fetched', $result['fetched']);
-        $apiLog?->increment('articles_saved', $result['saved']);
-
-        $log->info("--- SOURCE {$this->jobNum}/{$this->totalJobs}: Job complete ---", [
-            'source'  => $newsSource->external_id,
-            'fetched' => $result['fetched'],
-            'saved'   => $result['saved'],
+        $apiLog = ApiLog::create([
+            'cron_log_id'        => $this->cronLogId,
+            'news_api_source_id' => $endpoint->source->id,
+            'news_source_id'     => $newsSource->id,
+            'status'             => 'pending',
+            'articles_fetched'   => 0,
+            'articles_saved'     => 0,
+            'from_date'          => $from,
+            'to_date'            => $to,
+            'started_at'         => now(),
         ]);
+
+        try {
+            $service = new NewsApiFetcherService($endpoint, $from, $to);
+            $result  = $service->fetchSourceBatch($newsSource, $apiLog, $this->jobNum, $this->totalJobs);
+
+            $apiLog->update([
+                'status'           => 'success',
+                'finished_at'      => now(),
+                'articles_fetched' => $result['fetched'],
+                'articles_saved'   => $result['saved'],
+            ]);
+
+            $log->info("--- SOURCE {$this->jobNum}/{$this->totalJobs}: Job complete ---", [
+                'source'  => $newsSource->external_id,
+                'fetched' => $result['fetched'],
+                'saved'   => $result['saved'],
+            ]);
+        } catch (\Throwable $e) {
+            $apiLog->update([
+                'status'        => 'failed',
+                'finished_at'   => now(),
+                'error_message' => $e->getMessage(),
+            ]);
+
+            $log->error("--- SOURCE {$this->jobNum}/{$this->totalJobs}: Job failed ---", [
+                'source' => $newsSource->external_id,
+                'error'  => $e->getMessage(),
+            ]);
+
+            throw $e;
+        }
     }
 }

@@ -17,6 +17,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string                 $results_param
  * @property array|null             $response_param
  * @property bool                   $is_active
+ * @property bool                   $is_pagination
+ * @property int                    $per_page
  * @property \Carbon\Carbon|null    $last_fetched_at
  */
 class NewsApiEndpoint extends Model
@@ -32,6 +34,8 @@ class NewsApiEndpoint extends Model
         'results_param',
         'response_param',
         'is_active',
+        'is_pagination',
+        'per_page',
         'last_fetched_at',
     ];
 
@@ -39,6 +43,8 @@ class NewsApiEndpoint extends Model
         'request_config'  => 'array',
         'response_param'  => 'array',
         'is_active'       => 'boolean',
+        'is_pagination'   => 'boolean',
+        'per_page'        => 'integer',
         'last_fetched_at' => 'datetime',
     ];
 
