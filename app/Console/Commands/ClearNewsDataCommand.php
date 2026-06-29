@@ -66,6 +66,7 @@ class ClearNewsDataCommand extends Command
             $logDirs = [
                 storage_path('logs/newsapi'),
                 storage_path('logs/newsdata'),
+                storage_path('logs/guardian'),
             ];
 
             foreach ($logDirs as $dir) {

@@ -138,17 +138,35 @@ class NewsApiFetcherService
                 throw new \RuntimeException("{$source->name} request failed: " . $response->body());
             }
 
-            $body           = $response->json();
+            $body = $response->json();
+
+            // Unwrap nested response envelope if configured (e.g. Guardian wraps under 'response').
+            $wrapper = $this->requestConfig['response_wrapper'] ?? null;
+            if ($wrapper) {
+                $body = $body[$wrapper] ?? $body;
+            }
+
             $receivedStatus = $body[$this->endpoint->status_param] ?? null;
 
             if ($receivedStatus !== $this->endpoint->success_status) {
-                $message = $body['results']['message'] ?? $body['message'] ?? 'Unknown error';
+                $message = $body['message'] ?? 'Unknown error';
                 throw new \RuntimeException("{$source->name} error: {$message}");
             }
 
-            $rawArticles   = $body[$this->endpoint->results_param] ?? [];
-            $nextPageToken = $body['nextPage'] ?? null;
-            $pageCount     = \count($rawArticles);
+            $rawArticles = $body[$this->endpoint->results_param] ?? [];
+            $pageCount   = \count($rawArticles);
+
+            // Resolve next-page token — token-based (NewsData) or page-number-based (Guardian).
+            $paginationType = $this->requestConfig['pagination_type'] ?? 'token';
+            if ($paginationType === 'page_number') {
+                $currentPage   = (int) ($body[$this->requestConfig['current_page_param'] ?? 'currentPage'] ?? 0);
+                $totalPages    = (int) ($body[$this->requestConfig['total_pages_param']   ?? 'pages']       ?? 0);
+                $nextPageToken = ($currentPage > 0 && $currentPage < $totalPages)
+                    ? (string) ($currentPage + 1)
+                    : null;
+            } else {
+                $nextPageToken = $body['nextPage'] ?? null;
+            }
 
             $this->log->info("--- SOURCE {$jobNum}/{$totalJobs}: Mapping articles (page {$pageNum}) ---", [
                 'articles_in_response' => $pageCount,

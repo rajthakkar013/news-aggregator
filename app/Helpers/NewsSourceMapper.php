@@ -13,6 +13,7 @@ class NewsSourceMapper
         return match ($slug) {
             'newsapi'  => static::mapNewsApiSource($raw, $newsApiSourceId),
             'newsdata' => static::mapNewsDataSource($raw, $newsApiSourceId),
+            'guardian' => static::mapGuardianSection($raw, $newsApiSourceId),
             default    => [],
         };
     }
@@ -59,6 +60,29 @@ class NewsSourceMapper
             'priority'           => $raw['priority']      ?? null,
             'total_articles'     => $raw['total_article'] ?? null,
             'last_fetch_at'      => $raw['last_fetch']    ?? null,
+        ];
+    }
+
+    /**
+     * Guardian /sections
+     * Sections act as sources — external_id (e.g. "football") is sent as `section=football`
+     * in article fetch requests.
+     */
+    private static function mapGuardianSection(array $raw, int $newsApiSourceId): array
+    {
+        return [
+            'news_api_source_id' => $newsApiSourceId,
+            'external_id'        => $raw['id']       ?? null,
+            'name'               => $raw['webTitle']  ?? null,
+            'description'        => null,
+            'url'                => $raw['webUrl']    ?? null,
+            'icon'               => null,
+            'category'           => null,
+            'language'           => null,
+            'country'            => null,
+            'priority'           => null,
+            'total_articles'     => null,
+            'last_fetch_at'      => null,
         ];
     }
 }

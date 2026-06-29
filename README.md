@@ -134,6 +134,7 @@ Each API source runs on its own named queue for isolation — a slow or failing 
 |---|---|
 | `newsapi` | NewsAPI.org |
 | `newsdata` | NewsData.io |
+| `guardian` | The Guardian |
 
 ### Running workers manually (testing)
 
@@ -143,6 +144,9 @@ php artisan queue:work --queue=newsapi --tries=3 --timeout=60
 
 # Worker for NewsData
 php artisan queue:work --queue=newsdata --tries=3 --timeout=60
+
+# Worker for The Guardian
+php artisan queue:work --queue=guardian --tries=3 --timeout=60
 ```
 
 ---
@@ -190,6 +194,19 @@ user=www-data
 numprocs=1
 redirect_stderr=true
 stdout_logfile=/var/www/news-aggregator/storage/logs/worker-newsdata.log
+stopwaitsecs=60
+
+[program:news-worker-guardian]
+process_name=%(program_name)s_%(process_num)02d
+command=php /var/www/news-aggregator/artisan queue:work --queue=guardian --tries=3 --timeout=60 --sleep=3
+autostart=true
+autorestart=true
+stopasgroup=true
+killasgroup=true
+user=www-data
+numprocs=1
+redirect_stderr=true
+stdout_logfile=/var/www/news-aggregator/storage/logs/worker-guardian.log
 stopwaitsecs=60
 ```
 
@@ -391,7 +408,7 @@ Items intentionally left in development mode that must be changed before deployi
 
 | # | File | Line | What to do |
 |---|---|---|---|
-| 1 | `app/Jobs/FetchNewsSourceJob.php` | `->take(2)` | Remove the `->take(2)` limit so all active sources are fetched, not just the first 2 |
+| 1 | `app/Jobs/FetchNewsSourceJob.php` | `->take(5)` | Remove the `->take(5)` limit so all active sources are fetched, not just the first 5 |
 
 ---
 

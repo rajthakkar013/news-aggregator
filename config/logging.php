@@ -143,6 +143,14 @@ return [
             'replace_placeholders' => true,
         ],
 
+        'guardian' => [
+            'driver'              => 'daily',
+            'path'                => storage_path('logs/guardian/guardian.log'),
+            'level'               => 'debug',
+            'days'                => 30,
+            'replace_placeholders' => true,
+        ],
+
     ],
 
 ];
