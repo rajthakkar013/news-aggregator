@@ -158,5 +158,81 @@ class NewsApiSourceSeeder extends Seeder
                 'is_active'      => true,
             ]
         );
+
+        // ------------------------------------------------------------------ //
+        // The Guardian
+        // ------------------------------------------------------------------ //
+        $guardian = NewsApiSource::updateOrCreate(
+            ['slug' => 'guardian'],
+            [
+                'name'        => 'The Guardian',
+                'slug'        => 'guardian',
+                'base_url'    => 'https://content.guardianapis.com',
+                'auth_type'   => 'api_key',
+                'credentials' => [
+                    'api_key'    => '43125b35-42ef-4260-a715-72d57f087ba4',
+                    'param_name' => 'api-key',
+                ],
+                'is_active' => true,
+            ]
+        );
+
+        NewsApiEndpoint::updateOrCreate(
+            ['news_api_source_id' => $guardian->id, 'endpoint' => '/search'],
+            [
+                'name'           => 'Search',
+                'type'           => 'articles',
+                'endpoint'       => '/search',
+                'request_config' => [
+                    'method'             => 'GET',
+                    'response_wrapper'   => 'response',
+                    'pagination_type'    => 'page_number',
+                    'current_page_param' => 'currentPage',
+                    'total_pages_param'  => 'pages',
+                    'date_from_param'    => 'from-date',
+                    'date_to_param'      => 'to-date',
+                    'date_format'        => 'Y-m-d',
+                    'default_params'     => [
+                        'show-fields' => 'headline,byline,trailText,body,thumbnail',
+                    ],
+                ],
+                'is_pagination'  => true,
+                'per_page'       => 10,
+                'status_param'   => 'status',
+                'success_status' => 'ok',
+                'results_param'  => 'results',
+                'response_param' => [
+                    'total_results' => 'pages',
+                    'title'         => 'webTitle',
+                    'url'           => 'webUrl',
+                    'published_at'  => 'webPublicationDate',
+                    'source_id'     => 'sectionId',
+                    'source_name'   => 'sectionName',
+                    'author'        => 'fields.byline',
+                    'description'   => 'fields.trailText',
+                    'content'       => 'fields.body',
+                    'image_url'     => 'fields.thumbnail',
+                ],
+                'is_active' => true,
+            ]
+        );
+
+        NewsApiEndpoint::updateOrCreate(
+            ['news_api_source_id' => $guardian->id, 'endpoint' => '/sections'],
+            [
+                'name'           => 'Sections',
+                'type'           => 'sources',
+                'endpoint'       => '/sections',
+                'request_config' => [
+                    'method'           => 'GET',
+                    'response_wrapper' => 'response',
+                ],
+                'status_param'   => 'status',
+                'success_status' => 'ok',
+                'results_param'  => 'results',
+                'response_param' => null,
+                'is_active'      => true,
+            ]
+        );
     }
 }

@@ -15,9 +15,10 @@ class SourceParameterHelper
     public static function addSourceParameters(NewsApiEndpoint $endpoint, Carbon $from, Carbon $to): array
     {
         return match ($endpoint->source->slug) {
-            'newsapi'  => static::addNewsApiParameters($endpoint, $from, $to),
-            'newsdata' => static::addNewsDataParameters($endpoint, $from, $to),
-            default    => [],
+            'newsapi'   => static::addNewsApiParameters($endpoint, $from, $to),
+            'newsdata'  => static::addNewsDataParameters($endpoint, $from, $to),
+            'guardian'  => static::addGuardianParameters($endpoint, $from, $to),
+            default     => [],
         };
     }
 
@@ -30,6 +31,7 @@ class SourceParameterHelper
         return match ($endpoint->source->slug) {
             'newsapi'  => static::buildNewsApiSourceParam($source),
             'newsdata' => static::buildNewsDataDomainParam($source),
+            'guardian' => static::buildGuardianSectionParam($source),
             default    => [],
         };
     }
@@ -90,5 +92,31 @@ class SourceParameterHelper
     private static function buildNewsDataDomainParam(NewsSource $source): array
     {
         return $source->external_id ? ['domain' => $source->external_id] : [];
+    }
+
+    /**
+     * Guardian: `section` = single external_id (e.g. football, world, technology).
+     */
+    private static function buildGuardianSectionParam(NewsSource $source): array
+    {
+        return $source->external_id ? ['section' => $source->external_id] : [];
+    }
+
+    private static function addGuardianParameters(NewsApiEndpoint $endpoint, Carbon $from, Carbon $to): array
+    {
+        $config    = $endpoint->request_config ?? [];
+        $fromParam = $config['date_from_param'] ?? null;
+        $toParam   = $config['date_to_param']   ?? null;
+
+        if (!$fromParam || !$toParam) {
+            return [];
+        }
+
+        $format = $config['date_format'] ?? 'Y-m-d';
+
+        return [
+            $fromParam => $from->utc()->format($format),
+            $toParam   => $to->utc()->format($format),
+        ];
     }
 }

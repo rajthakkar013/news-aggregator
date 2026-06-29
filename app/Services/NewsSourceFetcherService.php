@@ -46,7 +46,15 @@ class NewsSourceFetcherService
             throw new \RuntimeException("{$source->name} sources request failed: " . $response->body());
         }
 
-        $body           = $response->json();
+        $body = $response->json();
+
+        // Unwrap nested response envelope if configured (e.g. Guardian wraps under 'response').
+        $config  = $this->endpoint->request_config ?? [];
+        $wrapper = $config['response_wrapper'] ?? null;
+        if ($wrapper) {
+            $body = $body[$wrapper] ?? $body;
+        }
+
         $receivedStatus = $body[$this->endpoint->status_param] ?? null;
 
         if ($receivedStatus !== $this->endpoint->success_status) {

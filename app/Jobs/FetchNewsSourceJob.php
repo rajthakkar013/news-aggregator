@@ -30,10 +30,10 @@ class FetchNewsSourceJob implements ShouldQueue
             'cron_log_id' => $this->cronLogId,
         ]);
 
-        // TODO: remove take(2) before production
+        // TODO: remove take(5) before production
         $allSources = NewsSource::where('news_api_source_id', $source->id)
             ->where('is_active', true)
-            ->take(2)
+            ->take(5)
             ->get();
 
         if ($allSources->isEmpty()) {
