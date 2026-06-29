@@ -3,9 +3,11 @@
 namespace App\Services;
 
 use App\Helpers\SourceParameterHelper;
+use App\Models\ApiLog;
 use App\Models\Article;
 use App\Models\NewsApiEndpoint;
 use App\Models\NewsSource;
+use App\Models\PaginationLog;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -49,65 +51,135 @@ class NewsApiFetcherService
         return \array_filter($this->params, fn($k) => $k !== $keyParam, ARRAY_FILTER_USE_KEY);
     }
 
-    public function fetchSourceBatch(NewsSource $newsSource, int $jobNum, int $totalJobs): array
+    public function fetchSourceBatch(NewsSource $newsSource, ApiLog $apiLog, int $jobNum, int $totalJobs): array
     {
-        $source       = $this->endpoint->source;
         $sourceParams = SourceParameterHelper::buildSourceFilterParam($this->endpoint, $newsSource);
 
         // NewsAPI: 'sources' and 'q' are mutually exclusive — remove 'q' when sources is set.
-        $batchParams = $this->params;
+        $baseParams = $this->params;
         if (isset($sourceParams['sources'])) {
-            unset($batchParams['q']);
+            unset($baseParams['q']);
         }
-        $batchParams = array_merge($batchParams, $sourceParams);
+        $baseParams = array_merge($baseParams, $sourceParams);
 
-        $logParams = $batchParams;
+        $totalFetched = 0;
+        $totalSaved   = 0;
+        $pageNum      = 1;
+        $pageFetched  = 0;
+
+        if ($this->endpoint->is_pagination) {
+            // Resume from last successful pagination_log for this source, if any.
+            $lastPagLog   = PaginationLog::where('news_source_id', $newsSource->id)
+                ->where('status', 'success')
+                ->whereNotNull('next_page_token')
+                ->latest()
+                ->first();
+            $currentToken = $lastPagLog?->next_page_token;
+        } else {
+            $currentToken = null;
+        }
+
+        do {
+            $pageResult    = $this->fetchOnePage($baseParams, $apiLog, $newsSource->id, $pageNum, $currentToken, $jobNum, $totalJobs);
+            $totalFetched += $pageResult['fetched'];
+            $totalSaved   += $pageResult['saved'];
+            $pageFetched   = $pageResult['page_count'];
+            $currentToken  = $pageResult['next_page'];
+            $pageNum++;
+        } while ($this->endpoint->is_pagination && $currentToken && $pageFetched >= $this->endpoint->per_page);
+
+        return ['fetched' => $totalFetched, 'saved' => $totalSaved];
+    }
+
+    private function fetchOnePage(
+        array $baseParams,
+        ApiLog $apiLog,
+        int $newsSourceId,
+        int $pageNum,
+        ?string $token,
+        int $jobNum,
+        int $totalJobs,
+    ): array {
+        $source = $this->endpoint->source;
+
+        $requestParams = $baseParams;
+        if ($token) {
+            $requestParams['page'] = $token;
+        }
+
+        $pagLog = PaginationLog::create([
+            'api_log_id'      => $apiLog->id,
+            'news_source_id'  => $newsSourceId,
+            'page_number'     => $pageNum,
+            'status'          => 'pending',
+            'articles_fetched' => 0,
+            'articles_saved'   => 0,
+            'started_at'      => now(),
+        ]);
+
+        $logParams = $requestParams;
         $logParams[$this->credentials['param_name']] = '***';
-        $this->log->info("--- SOURCE {$jobNum}/{$totalJobs}: HTTP request ---", [
-            'source' => $newsSource->external_id,
-            'url'    => urldecode($this->url . '?' . http_build_query($logParams)),
+        $this->log->info("--- SOURCE {$jobNum}/{$totalJobs}: HTTP request (page {$pageNum}) ---", [
+            'url' => urldecode($this->url . '?' . http_build_query($logParams)),
         ]);
 
-        echo $this->url . '?' . http_build_query($batchParams) . PHP_EOL;
-        $response = Http::get($this->url, $batchParams);
+        echo $this->url . '?' . http_build_query($requestParams) . PHP_EOL;
 
-        $this->log->info("--- SOURCE {$jobNum}/{$totalJobs}: Response received ---", [
-            'http_status'   => $response->status(),
-            'response_size' => \strlen($response->body()) . ' bytes',
-            'response_body' => substr($response->body(), 0, 300),
-        ]);
+        try {
+            $response = Http::get($this->url, $requestParams);
 
-        if (!$response->successful()) {
-            $this->log->error("SOURCE {$jobNum}: Request failed", [
-                'http_status' => $response->status(),
-                'body'        => $response->body(),
+            $this->log->info("--- SOURCE {$jobNum}/{$totalJobs}: Response received (page {$pageNum}) ---", [
+                'http_status'   => $response->status(),
+                'response_size' => \strlen($response->body()) . ' bytes',
+                'response_body' => substr($response->body(), 0, 300),
             ]);
-            throw new \RuntimeException("{$source->name} request failed: " . $response->body());
+
+            if (!$response->successful()) {
+                throw new \RuntimeException("{$source->name} request failed: " . $response->body());
+            }
+
+            $body           = $response->json();
+            $receivedStatus = $body[$this->endpoint->status_param] ?? null;
+
+            if ($receivedStatus !== $this->endpoint->success_status) {
+                $message = $body['results']['message'] ?? $body['message'] ?? 'Unknown error';
+                throw new \RuntimeException("{$source->name} error: {$message}");
+            }
+
+            $rawArticles   = $body[$this->endpoint->results_param] ?? [];
+            $nextPageToken = $body['nextPage'] ?? null;
+            $pageCount     = \count($rawArticles);
+
+            $this->log->info("--- SOURCE {$jobNum}/{$totalJobs}: Mapping articles (page {$pageNum}) ---", [
+                'articles_in_response' => $pageCount,
+                'next_page'            => $nextPageToken,
+            ]);
+
+            $mapped = $this->mapAndSaveArticles($rawArticles, $jobNum);
+
+            $pagLog->update([
+                'status'           => 'success',
+                'articles_fetched' => $mapped['fetched'],
+                'articles_saved'   => $mapped['saved'],
+                'next_page_token'  => $nextPageToken,
+                'finished_at'      => now(),
+            ]);
+
+            return [
+                'fetched'    => $mapped['fetched'],
+                'saved'      => $mapped['saved'],
+                'page_count' => $pageCount,
+                'next_page'  => $nextPageToken,
+            ];
+
+        } catch (\Throwable $e) {
+            $pagLog->update([
+                'status'        => 'failed',
+                'error_message' => $e->getMessage(),
+                'finished_at'   => now(),
+            ]);
+            throw $e;
         }
-
-        $body           = $response->json();
-        $receivedStatus = $body[$this->endpoint->status_param] ?? null;
-
-        $this->log->info("--- SOURCE {$jobNum}/{$totalJobs}: Checking status ---", [
-            'status_param'    => $this->endpoint->status_param,
-            'received_status' => $receivedStatus,
-            'expected_status' => $this->endpoint->success_status,
-        ]);
-
-        if ($receivedStatus !== $this->endpoint->success_status) {
-            $message = $body['results']['message'] ?? $body['message'] ?? 'Unknown error';
-            $this->log->error("SOURCE {$jobNum}: API error", ['message' => $message]);
-            throw new \RuntimeException("{$source->name} error: {$message}");
-        }
-
-        $rawArticles = $body[$this->endpoint->results_param] ?? [];
-
-        $this->log->info("--- SOURCE {$jobNum}/{$totalJobs}: Mapping articles ---", [
-            'results_param'        => $this->endpoint->results_param,
-            'articles_in_response' => \count($rawArticles),
-        ]);
-
-        return $this->mapAndSaveArticles($rawArticles, $jobNum);
     }
 
     private function mapAndSaveArticles(array $rawArticles, int $batchNum): array

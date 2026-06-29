@@ -67,7 +67,7 @@ class FetchNewsSourceBatchJob implements ShouldQueue
 
         try {
             $service = new NewsApiFetcherService($endpoint, $from, $to);
-            $result  = $service->fetchSourceBatch($newsSource, $this->jobNum, $this->totalJobs);
+            $result  = $service->fetchSourceBatch($newsSource, $apiLog, $this->jobNum, $this->totalJobs);
 
             $apiLog->update([
                 'status'           => 'success',

@@ -102,6 +102,8 @@ class NewsApiSourceSeeder extends Seeder
                 'request_config' => [
                     'method' => 'GET',
                 ],
+                'is_pagination'  => true,
+                'per_page'       => 10,
                 'status_param'   => 'status',
                 'success_status' => 'success',
                 'results_param'  => 'results',

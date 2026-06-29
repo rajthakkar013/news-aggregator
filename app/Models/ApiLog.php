@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class ApiLog extends Model
 {
@@ -43,5 +44,10 @@ class ApiLog extends Model
     public function newsSource(): BelongsTo
     {
         return $this->belongsTo(NewsSource::class, 'news_source_id');
+    }
+
+    public function paginationLogs(): HasMany
+    {
+        return $this->hasMany(PaginationLog::class);
     }
 }

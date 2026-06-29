@@ -7,6 +7,7 @@ use App\Models\Article;
 use App\Models\CronLog;
 use App\Models\NewsApiEndpoint;
 use App\Models\NewsSource;
+use App\Models\PaginationLog;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\File;
@@ -33,6 +34,10 @@ class ClearNewsDataCommand extends Command
             $sources = NewsSource::count();
             NewsSource::truncate();
             $this->line("  news_sources → {$sources} rows deleted");
+
+            $pagLogs = PaginationLog::count();
+            PaginationLog::truncate();
+            $this->line("  pag_logs     → {$pagLogs} rows deleted");
 
             $apiLogs = ApiLog::count();
             ApiLog::truncate();
